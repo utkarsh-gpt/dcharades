@@ -198,6 +198,13 @@ io.on('connection', (socket) => {
     try {
       let game = games.get(gameId);
       
+      // Check if player is already in this game
+      if (game && game.players.find(p => p.id === socket.id)) {
+        socket.join(gameId);
+        socket.emit('game-state', game);
+        return;
+      }
+      
       if (!game) {
         if (!isHost) {
           socket.emit('error', 'Game not found');
@@ -308,7 +315,45 @@ io.on('connection', (socket) => {
     const player = game.players.find(p => p.id === socket.id);
     if (!player || player.id !== game.currentActorId) return;
     
-    endRound(gameId, false);
+    // Get a new movie instead of ending the round
+    const movie = getRandomMovie(game.settings.movieCategories);
+    game.currentMovie = movie.title;
+    
+    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('movie-skipped', {
+      newMovie: movie.title,
+    });
+  });
+
+  socket.on('play-again', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (!game) return;
+    
+    // Reset game state to lobby
+    game.currentRound = 0;
+    game.currentActorId = null;
+    game.currentGuesser = null;
+    game.currentMovie = null;
+    game.timeRemaining = 0;
+    game.isActive = false;
+    game.isGameStarted = false;
+    game.isRoundActive = false;
+    game.winner = null;
+    
+    // Clear any active timers
+    if (game.roundTimer) {
+      clearInterval(game.roundTimer);
+      game.roundTimer = null;
+    }
+    
+    // Reset scores and auto-ready players
+    game.players.forEach(player => {
+      player.score = 0;
+      player.isReady = true; // Auto-ready players
+    });
+    
+    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('play-again-reset');
   });
 
   socket.on('leave-game', ({ gameId }) => {

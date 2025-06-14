@@ -9,6 +9,7 @@ interface GamePlayProps {
   currentPlayer: Player;
   onMovieGuessed: () => void;
   onSkipMovie: () => void;
+  onPlayAgain: () => void;
 }
 
 export default function GamePlay({
@@ -16,7 +17,9 @@ export default function GamePlay({
   currentPlayer,
   onMovieGuessed,
   onSkipMovie,
+  onPlayAgain,
 }: GamePlayProps) {
+  const [skippedMessage, setSkippedMessage] = useState('');
   const isActor = currentPlayer.id === gameState.currentActorId;
   const otherPlayer = gameState.players.find(p => p.id !== currentPlayer.id);
   const actorPlayer = gameState.players.find(p => p.id === gameState.currentActorId);
@@ -71,7 +74,7 @@ export default function GamePlay({
               ))}
           </div>
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={onPlayAgain}
             className="btn-primary"
           >
             Play Again
@@ -119,6 +122,11 @@ export default function GamePlay({
               <div className="text-2xl font-bold text-game-primary mb-4">
                 {gameState.currentMovie}
               </div>
+              {skippedMessage && (
+                <div className="text-sm text-game-warning mb-2 animate-pulse">
+                  {skippedMessage}
+                </div>
+              )}
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Act out this movie without speaking or writing!
               </p>

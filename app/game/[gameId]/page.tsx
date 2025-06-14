@@ -7,7 +7,7 @@ import { GameState, Player, DEFAULT_SETTINGS, GameSettings } from '@/lib/types';
 import { getRandomMovie } from '@/lib/movies';
 import GameLobby from '@/components/GameLobby';
 import GamePlay from '@/components/GamePlay';
-import GameSettings from '@/components/GameSettings';
+import GameSettingsModal from '@/components/GameSettings';
 
 export default function GamePage() {
   const params = useParams();
@@ -117,6 +117,12 @@ export default function GamePage() {
     }
   }, [socket, currentPlayer, gameState, gameId]);
 
+  const handlePlayAgain = useCallback(() => {
+    if (socket) {
+      socket.emit('play-again', { gameId });
+    }
+  }, [socket, gameId]);
+
   const handleLeaveGame = useCallback(() => {
     if (socket) {
       socket.emit('leave-game', { gameId });
@@ -217,12 +223,13 @@ export default function GamePage() {
             currentPlayer={currentPlayer}
             onMovieGuessed={handleMovieGuessed}
             onSkipMovie={handleSkipMovie}
+            onPlayAgain={handlePlayAgain}
           />
         )}
 
         {/* Settings Modal */}
         {showSettings && currentPlayer.isHost && (
-          <GameSettings
+          <GameSettingsModal
             settings={gameState.settings}
             onUpdateSettings={handleUpdateSettings}
             onClose={() => setShowSettings(false)}
