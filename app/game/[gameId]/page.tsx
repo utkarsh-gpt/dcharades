@@ -49,9 +49,8 @@ export default function GamePage() {
       setGameState(state);
       setIsLoading(false);
       
-      // Find current player
-      const playerName = localStorage.getItem('playerName');
-      const player = state.players.find(p => p.name === playerName);
+      // Find current player by socket ID
+      const player = state.players.find(p => p.id === socket?.id);
       setCurrentPlayer(player || null);
     };
 

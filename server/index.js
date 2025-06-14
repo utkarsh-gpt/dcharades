@@ -89,9 +89,30 @@ function getRandomMovie(categories) {
   return filteredMovies[Math.floor(Math.random() * filteredMovies.length)];
 }
 
+function getGameStateForClient(game) {
+  // Return game state without timer to prevent circular reference
+  return {
+    id: game.id,
+    players: game.players,
+    settings: game.settings,
+    currentRound: game.currentRound,
+    currentActorId: game.currentActorId,
+    currentGuesser: game.currentGuesser,
+    currentMovie: game.currentMovie,
+    timeRemaining: game.timeRemaining,
+    isActive: game.isActive,
+    isGameStarted: game.isGameStarted,
+    isRoundActive: game.isRoundActive,
+    winner: game.winner,
+  };
+}
+
 function startNewRound(gameId) {
   const game = games.get(gameId);
   if (!game || game.currentRound >= game.settings.rounds) return;
+
+  console.log(`Starting round ${game.currentRound + 1} for game ${gameId}`);
+  console.log(`Game has ${game.players.length} players:`, game.players.map(p => ({ id: p.id, name: p.name })));
 
   game.currentRound++;
   
@@ -102,32 +123,50 @@ function startNewRound(gameId) {
     game.currentActorId = game.players[nextActorIndex].id;
   } else {
     // First round - randomly select actor
-    game.currentActorId = game.players[Math.floor(Math.random() * game.players.length)].id;
+    if (game.players.length > 0) {
+      const randomIndex = Math.floor(Math.random() * game.players.length);
+      game.currentActorId = game.players[randomIndex].id;
+      console.log(`Selected actor: ${game.players[randomIndex].name} (ID: ${game.currentActorId})`);
+    }
   }
   
   game.currentGuesser = game.players.find(p => p.id !== game.currentActorId)?.id || null;
+  console.log(`Current actor: ${game.currentActorId}, Current guesser: ${game.currentGuesser}`);
   
   // Get random movie
   const movie = getRandomMovie(game.settings.movieCategories);
   game.currentMovie = movie.title;
+  console.log(`Selected movie: ${movie.title}`);
   
   // Set timer
   game.timeRemaining = game.settings.timeLimit;
   game.isRoundActive = true;
+  console.log(`Timer set to: ${game.timeRemaining} seconds`);
+  
+  // Clear any existing timer first
+  if (game.roundTimer) {
+    clearInterval(game.roundTimer);
+    game.roundTimer = null;
+  }
   
   // Start countdown timer
   if (game.settings.timeLimit > 0) {
     game.roundTimer = setInterval(() => {
-      game.timeRemaining--;
-      io.to(gameId).emit('game-state', game);
-      
-      if (game.timeRemaining <= 0) {
-        endRound(gameId, false);
+      if (game.timeRemaining > 0) {
+        game.timeRemaining--;
+        io.to(gameId).emit('game-state', getGameStateForClient(game));
+        
+        if (game.timeRemaining <= 0) {
+          endRound(gameId, false);
+        }
       }
     }, 1000);
   }
   
-  io.to(gameId).emit('game-state', game);
+  // Emit game state first (exclude timer to prevent circular reference)
+  io.to(gameId).emit('game-state', getGameStateForClient(game));
+  
+  // Then emit round started event
   io.to(gameId).emit('round-started', {
     round: game.currentRound,
     actorId: game.currentActorId,
@@ -141,6 +180,7 @@ function endRound(gameId, wasGuessed = false) {
 
   game.isRoundActive = false;
   
+  // Clear the timer
   if (game.roundTimer) {
     clearInterval(game.roundTimer);
     game.roundTimer = null;
@@ -154,6 +194,9 @@ function endRound(gameId, wasGuessed = false) {
     if (actor) actor.score++;
     if (guesser) guesser.score++;
   }
+  
+  // Emit game state update (exclude timer to prevent circular reference)
+  io.to(gameId).emit('game-state', getGameStateForClient(game));
   
   io.to(gameId).emit('round-ended', {
     wasGuessed,
@@ -169,8 +212,6 @@ function endRound(gameId, wasGuessed = false) {
       startNewRound(gameId);
     }, 3000);
   }
-  
-  io.to(gameId).emit('game-state', game);
 }
 
 function endGame(gameId) {
@@ -188,7 +229,7 @@ function endGame(gameId) {
     finalScores: sortedPlayers.map(p => ({ id: p.id, name: p.name, score: p.score })),
   });
   
-  io.to(gameId).emit('game-state', game);
+  io.to(gameId).emit('game-state', getGameStateForClient(game));
 }
 
 io.on('connection', (socket) => {
@@ -201,7 +242,7 @@ io.on('connection', (socket) => {
       // Check if player is already in this game
       if (game && game.players.find(p => p.id === socket.id)) {
         socket.join(gameId);
-        socket.emit('game-state', game);
+        socket.emit('game-state', getGameStateForClient(game));
         return;
       }
       
@@ -242,7 +283,7 @@ io.on('connection', (socket) => {
       }
       
       socket.join(gameId);
-      socket.emit('game-state', game);
+      socket.emit('game-state', getGameStateForClient(game));
       socket.to(gameId).emit('player-joined', game.players.find(p => p.id === socket.id));
       
       console.log(`Player ${playerName} joined game ${gameId}`);
@@ -260,7 +301,7 @@ io.on('connection', (socket) => {
     if (!player || !player.isHost) return;
     
     game.settings = { ...game.settings, ...settings };
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
   });
 
   socket.on('player-ready', ({ gameId, playerId }) => {
@@ -271,29 +312,53 @@ io.on('connection', (socket) => {
     if (!player) return;
     
     player.isReady = !player.isReady;
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
   });
 
   socket.on('start-game', ({ gameId }) => {
+    console.log(`Start game requested for game ${gameId}`);
     const game = games.get(gameId);
-    if (!game) return;
+    if (!game) {
+      console.log(`Game ${gameId} not found`);
+      return;
+    }
     
     const player = game.players.find(p => p.id === socket.id);
-    if (!player || !player.isHost) return;
+    if (!player || !player.isHost) {
+      console.log(`Player ${socket.id} is not authorized to start game`);
+      return;
+    }
     
     if (game.players.length !== 2 || !game.players.every(p => p.isReady)) {
+      console.log(`Cannot start game: ${game.players.length} players, ready status:`, game.players.map(p => ({ name: p.name, ready: p.isReady })));
       socket.emit('error', 'All players must be ready');
       return;
     }
     
+    console.log(`Initializing game ${gameId} with players:`, game.players.map(p => ({ id: p.id, name: p.name })));
+    
+    // Initialize game state
     game.isGameStarted = true;
     game.isActive = true;
+    game.currentRound = 0;
+    game.currentActorId = null;
+    game.currentGuesser = null;
+    game.currentMovie = null;
+    game.timeRemaining = 0;
+    game.isRoundActive = false;
     
+    // Reset player scores
+    game.players.forEach(player => {
+      player.score = 0;
+    });
+    
+    console.log(`Game ${gameId} initialized, emitting game-started event`);
     io.to(gameId).emit('game-started');
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
     
     // Start first round
     setTimeout(() => {
+      console.log(`Starting first round for game ${gameId}`);
       startNewRound(gameId);
     }, 1000);
   });
@@ -319,7 +384,7 @@ io.on('connection', (socket) => {
     const movie = getRandomMovie(game.settings.movieCategories);
     game.currentMovie = movie.title;
     
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
     io.to(gameId).emit('movie-skipped', {
       newMovie: movie.title,
     });
@@ -352,7 +417,7 @@ io.on('connection', (socket) => {
       player.isReady = true; // Auto-ready players
     });
     
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
     io.to(gameId).emit('play-again-reset');
   });
 
@@ -399,7 +464,7 @@ function handlePlayerLeave(socketId, gameId) {
     }
     
     io.to(gameId).emit('player-left', socketId);
-    io.to(gameId).emit('game-state', game);
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
   }
   
   console.log(`Player ${player.name} left game ${gameId}`);
@@ -408,4 +473,5 @@ function handlePlayerLeave(socketId, gameId) {
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
   console.log(`Socket.IO server running on port ${PORT}`);
+  console.log(`Server startup complete. Games map initialized.`);
 }); 
