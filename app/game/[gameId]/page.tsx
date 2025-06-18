@@ -60,11 +60,11 @@ export default function GamePage() {
     };
 
     const handlePlayerJoined = (player: Player) => {
-      console.log('Player joined:', player.name);
+      // Player joined
     };
 
     const handlePlayerLeft = (playerId: string) => {
-      console.log('Player left:', playerId);
+      // Player left
     };
 
     const handleGameStarted = () => {
@@ -117,10 +117,9 @@ export default function GamePage() {
   }, [socket, currentPlayer, gameState, gameId]);
 
   const handlePlayAgain = useCallback(() => {
-    if (socket) {
-      socket.emit('play-again', { gameId });
-    }
-  }, [socket, gameId]);
+    // Instead of resetting the game, redirect to charades lobby
+    router.push('/charades');
+  }, [router]);
 
   const handleLeaveGame = useCallback(() => {
     if (socket) {

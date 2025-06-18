@@ -6,9 +6,9 @@ import { SocketProvider } from '@/lib/socket-context'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Charades Game - Online Two Player Movie Guessing Game',
-  description: 'Play charades online with a friend! Guess Hollywood and Bollywood movies in this fun two-player game.',
-  keywords: 'charades, movie game, online game, two player, guessing game',
+  title: 'Game Hub - Multiplayer Online Games Collection',
+  description: 'Play fun multiplayer games online with friends! Including Charades, Trivia, Drawing Games, and more. Start playing now!',
+  keywords: 'online games, multiplayer games, charades, trivia, drawing game, party games, friends, word games',
 }
 
 export default function RootLayout({

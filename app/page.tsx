@@ -1,153 +1,272 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { v4 as uuidv4 } from 'uuid';
+import { useState } from 'react';
+
+interface Game {
+  id: string;
+  title: string;
+  description: string;
+  emoji: string;
+  players: string;
+  duration: string;
+  difficulty: 'Easy' | 'Medium' | 'Hard';
+  category: string;
+  route: string;
+  isAvailable: boolean;
+}
 
 export default function HomePage() {
-  const [playerName, setPlayerName] = useState('');
-  const [gameId, setGameId] = useState('');
-  const [isCreating, setIsCreating] = useState(false);
-  const [isJoining, setIsJoining] = useState(false);
   const router = useRouter();
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  const handleCreateGame = async () => {
-    if (!playerName.trim()) {
-      alert('Please enter your name');
-      return;
+  const games: Game[] = [
+    {
+      id: 'charades',
+      title: 'Charades',
+      description: 'Act out movie titles while your friend guesses! Classic charades with Hollywood and Bollywood movies.',
+      emoji: '🎭',
+      players: '2 Players',
+      duration: '10-15 min',
+      difficulty: 'Medium',
+      category: 'Acting',
+      route: '/charades',
+      isAvailable: true,
+    },
+    {
+      id: 'blockbuster',
+      title: 'Blockbuster',
+      description: 'Team-based Bollywood movie trivia! Compete in head-to-head challenges and movie guessing rounds.',
+      emoji: '🎬',
+      players: '4-12 Players',
+      duration: '20-30 min',
+      difficulty: 'Medium',
+      category: 'Movie Trivia',
+      route: '/blockbuster',
+      isAvailable: true,
+    },
+    {
+      id: 'trivia-battle',
+      title: 'Trivia Battle',
+      description: 'Test your knowledge across multiple categories in this competitive trivia game.',
+      emoji: '🧩',
+      players: '2-6 Players',
+      duration: '15-20 min',
+      difficulty: 'Hard',
+      category: 'Knowledge',
+      route: '/trivia',
+      isAvailable: false,
+    },
+    {
+      id: 'drawing-game',
+      title: 'Drawing Game',
+      description: 'Draw and guess! Create drawings for others to guess in this artistic challenge.',
+      emoji: '🎨',
+      players: '2-8 Players',
+      duration: '10-15 min',
+      difficulty: 'Medium',
+      category: 'Creative',
+      route: '/drawing',
+      isAvailable: false,
+    },
+    {
+      id: 'story-builder',
+      title: 'Story Builder',
+      description: 'Collaborate to create hilarious stories! Each player adds one sentence at a time.',
+      emoji: '📚',
+      players: '2-6 Players',
+      duration: '10-20 min',
+      difficulty: 'Easy',
+      category: 'Creative',
+      route: '/story-builder',
+      isAvailable: false,
+    },
+    {
+      id: 'riddles',
+      title: 'Riddle Master',
+      description: 'Challenge your logic with mind-bending riddles and puzzles.',
+      emoji: '🔍',
+      players: '1-4 Players',
+      duration: '15-25 min',
+      difficulty: 'Hard',
+      category: 'Logic',
+      route: '/riddles',
+      isAvailable: false,
+    },
+  ];
+
+  const categories = ['All', ...Array.from(new Set(games.map(game => game.category)))];
+
+  const filteredGames = selectedCategory === 'All' 
+    ? games 
+    : games.filter(game => game.category === selectedCategory);
+
+  const handleGameClick = (game: Game) => {
+    if (game.isAvailable) {
+      router.push(game.route);
     }
-
-    setIsCreating(true);
-    const newGameId = uuidv4().substring(0, 8).toUpperCase();
-    
-    // Store player info in localStorage
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isHost', 'true');
-    
-    router.push(`/game/${newGameId}`);
   };
 
-  const handleJoinGame = async () => {
-    if (!playerName.trim()) {
-      alert('Please enter your name');
-      return;
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'Easy': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'Medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'Hard': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
-    
-    if (!gameId.trim()) {
-      alert('Please enter a game ID');
-      return;
-    }
-
-    setIsJoining(true);
-    
-    // Store player info in localStorage
-    localStorage.setItem('playerName', playerName);
-    localStorage.setItem('isHost', 'false');
-    
-    router.push(`/game/${gameId.toUpperCase()}`);
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 dark:text-white mb-2">
-            🎭 Charades Game
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-bold text-gray-800 dark:text-white mb-4">
+            🎮 Game Hub
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Play movie charades with a friend online!
+          <p className="text-xl text-gray-600 dark:text-gray-300 mb-4">
+            Choose from our collection of fun multiplayer games to play with friends!
           </p>
-        </div>
-
-        {/* Main Card */}
-        <div className="game-card">
-          {/* Player Name Input */}
-          <div className="mb-6">
-            <label htmlFor="playerName" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Your Name
-            </label>
-            <input
-              type="text"
-              id="playerName"
-              value={playerName}
-              onChange={(e) => setPlayerName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-game-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-              placeholder="Enter your name"
-              maxLength={20}
-            />
-          </div>
-
-          {/* Create Game Section */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
-              Create New Game
-            </h3>
+          
+          {/* Demo Link */}
+          <div className="mb-8">
             <button
-              onClick={handleCreateGame}
-              disabled={isCreating || !playerName.trim()}
-              className="w-full btn-primary disabled:bg-gray-400 disabled:cursor-not-allowed"
+              onClick={() => router.push('/movie-demo')}
+              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 text-sm font-medium"
             >
-              {isCreating ? 'Creating...' : 'Create Game'}
+              🎬 View Movie Selection Demo
             </button>
           </div>
-
-          {/* Divider */}
-          <div className="relative mb-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400">
-                OR
-              </span>
-            </div>
-          </div>
-
-          {/* Join Game Section */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-3">
-              Join Existing Game
-            </h3>
-            <div className="mb-3">
-              <label htmlFor="gameId" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Game ID
-              </label>
-              <input
-                type="text"
-                id="gameId"
-                value={gameId}
-                onChange={(e) => setGameId(e.target.value.toUpperCase())}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-game-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                placeholder="Enter game ID"
-                maxLength={8}
-              />
-            </div>
-            <button
-              onClick={handleJoinGame}
-              disabled={isJoining || !playerName.trim() || !gameId.trim()}
-              className="w-full btn-secondary disabled:bg-gray-400 disabled:cursor-not-allowed"
-            >
-              {isJoining ? 'Joining...' : 'Join Game'}
-            </button>
+          
+          {/* Category Filter */}
+          <div className="flex flex-wrap justify-center gap-2 mb-8">
+            {categories.map((category) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${
+                  selectedCategory === category
+                    ? 'bg-game-primary text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {category}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Game Rules */}
-        <div className="mt-8 text-center">
-          <details className="text-left">
-            <summary className="cursor-pointer text-game-primary font-medium mb-2">
-              How to Play
-            </summary>
-            <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
-              <p>1. Two players join a game session</p>
-              <p>2. Both players press "Ready" to start</p>
-              <p>3. One player acts out a movie title</p>
-              <p>4. The other player tries to guess within the time limit</p>
-              <p>5. Roles switch for the next round</p>
-              <p>6. Game continues for the set number of rounds</p>
+        {/* Games Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+          {filteredGames.map((game) => (
+            <div
+              key={game.id}
+              onClick={() => handleGameClick(game)}
+              className={`game-card transition-all duration-300 transform hover:scale-105 ${
+                game.isAvailable 
+                  ? 'cursor-pointer hover:shadow-xl' 
+                  : 'opacity-60 cursor-not-allowed'
+              }`}
+            >
+              {/* Game Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  <span className="text-3xl">{game.emoji}</span>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+                      {game.title}
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {game.category}
+                    </p>
+                  </div>
+                </div>
+                {!game.isAvailable && (
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full dark:bg-gray-700 dark:text-gray-400">
+                    Coming Soon
+                  </span>
+                )}
+              </div>
+
+              {/* Game Description */}
+              <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm leading-relaxed">
+                {game.description}
+              </p>
+
+              {/* Game Info */}
+              <div className="flex flex-wrap gap-2 mb-4">
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full dark:bg-blue-900 dark:text-blue-200">
+                  {game.players}
+                </span>
+                <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full dark:bg-purple-900 dark:text-purple-200">
+                  {game.duration}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full ${getDifficultyColor(game.difficulty)}`}>
+                  {game.difficulty}
+                </span>
+              </div>
+
+              {/* Play Button */}
+              <button
+                className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors duration-200 ${
+                  game.isAvailable
+                    ? 'btn-primary'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed dark:bg-gray-600 dark:text-gray-400'
+                }`}
+                disabled={!game.isAvailable}
+              >
+                {game.isAvailable ? 'Play Now' : 'Coming Soon'}
+              </button>
             </div>
-          </details>
+          ))}
+        </div>
+
+        {/* Stats Section */}
+        <div className="game-card text-center">
+          <h2 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
+            🎯 Game Stats
+          </h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <div className="text-3xl font-bold text-game-primary mb-1">
+                {games.filter(g => g.isAvailable).length}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Available Games
+              </div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-game-secondary mb-1">
+                {games.filter(g => !g.isAvailable).length}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Coming Soon
+              </div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-game-warning mb-1">
+                {categories.length - 1}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Categories
+              </div>
+            </div>
+            <div>
+              <div className="text-3xl font-bold text-game-danger mb-1">
+                ∞
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Fun Hours
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-12 text-gray-500 dark:text-gray-400">
+          <p className="text-sm">
+            More games coming soon! Have a suggestion? Let us know!
+          </p>
         </div>
       </div>
     </div>

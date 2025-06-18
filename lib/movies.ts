@@ -208,4 +208,95 @@ export function getMoviesByCategory(category: 'hollywood' | 'bollywood'): Movie[
 
 export function getMoviesByDifficulty(difficulty: 'easy' | 'medium' | 'hard'): Movie[] {
   return MOVIES.filter(movie => movie.difficulty === difficulty);
-} 
+}
+
+// Utility function to convert Movie to MovieCard with genre
+export function movieToMovieCard(movie: Movie): import('./types').MovieCard {
+  // Simple genre assignment based on title/category
+  const getGenre = (title: string, category: string): string => {
+    if (category === 'hollywood') {
+      if (title.includes('Avengers') || title.includes('Spider-Man') || title.includes('Batman') || title.includes('Superman')) return 'Action';
+      if (title.includes('Finding Nemo') || title.includes('Frozen') || title.includes('Shrek') || title.includes('Cars')) return 'Animation';
+      if (title.includes('Titanic') || title.includes('Forrest Gump')) return 'Romance';
+      if (title.includes('The Godfather') || title.includes('Pulp Fiction')) return 'Crime';
+      if (title.includes('Inception') || title.includes('The Matrix') || title.includes('Interstellar')) return 'Sci-Fi';
+      return 'Drama';
+    } else {
+      if (title.includes('Sholay') || title.includes('Singham') || title.includes('Dabangg') || title.includes('War')) return 'Action';
+      if (title.includes('Dilwale') || title.includes('Kuch Kuch') || title.includes('Dil To Pagal')) return 'Romance';
+      if (title.includes('3 Idiots') || title.includes('Golmaal') || title.includes('Housefull')) return 'Comedy';
+      if (title.includes('Dangal') || title.includes('Sultan') || title.includes('Bhaag Milkha')) return 'Sports';
+      if (title.includes('Lagaan') || title.includes('Mughal')) return 'Historical';
+      if (title.includes('Queen') || title.includes('Pink') || title.includes('Article')) return 'Social';
+      return 'Drama';
+    }
+  };
+
+  return {
+    id: `movie-${Math.random().toString(36).substr(2, 9)}`,
+    title: movie.title,
+    genre: getGenre(movie.title, movie.category),
+    category: movie.category,
+    difficulty: movie.difficulty,
+  };
+}
+
+// Function to get random movie cards for game
+export function getRandomMovieCards(count: number = 6): import('./types').MovieCard[] {
+  const randomMovies = [];
+  const moviesCopy = [...MOVIES];
+  
+  for (let i = 0; i < count && moviesCopy.length > 0; i++) {
+    const randomIndex = Math.floor(Math.random() * moviesCopy.length);
+    const movie = moviesCopy.splice(randomIndex, 1)[0];
+    randomMovies.push(movieToMovieCard(movie));
+  }
+  
+  return randomMovies;
+}
+
+// Sample movie cards for testing (can be removed if not needed)
+export const SAMPLE_MOVIE_CARDS: import('./types').MovieCard[] = [
+  {
+    id: 'movie-1',
+    title: '3 Idiots',
+    genre: 'Comedy',
+    category: 'bollywood',
+    difficulty: 'easy',
+  },
+  {
+    id: 'movie-2',
+    title: 'Sholay',
+    genre: 'Action',
+    category: 'bollywood',
+    difficulty: 'easy',
+  },
+  {
+    id: 'movie-3',
+    title: 'Dilwale Dulhania Le Jayenge',
+    genre: 'Romance',
+    category: 'bollywood',
+    difficulty: 'easy',
+  },
+  {
+    id: 'movie-4',
+    title: 'Dangal',
+    genre: 'Sports',
+    category: 'bollywood',
+    difficulty: 'easy',
+  },
+  {
+    id: 'movie-5',
+    title: 'Queen',
+    genre: 'Comedy',
+    category: 'bollywood',
+    difficulty: 'medium',
+  },
+  {
+    id: 'movie-6',
+    title: 'Andhadhun',
+    genre: 'Thriller',
+    category: 'bollywood',
+    difficulty: 'medium',
+  },
+]; 

@@ -1,5 +1,4 @@
 {
-  "/not-found": "app/not-found.js",
-  "/game/[gameId]/page": "app/game/[gameId]/page.js",
-  "/page": "app/page.js"
+  "/blockbuster/page": "app/blockbuster/page.js",
+  "/blockbuster-game/[gameId]/page": "app/blockbuster-game/[gameId]/page.js"
 }
