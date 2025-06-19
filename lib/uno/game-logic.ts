@@ -332,11 +332,9 @@ export class UnoGameLogic {
       cardsPlayed: [], // This would be populated during actual gameplay
     });
 
-    // Check for game end
-    if (winner.score >= gameState.settings.targetScore) {
-      gameState.currentPhase = 'game-over';
-      gameState.winner = winner;
-    }
+    // In this 2-player UNO variant, the game ends when a player wins a round
+    gameState.currentPhase = 'game-over';
+    gameState.winner = winner;
   }
 
   // Calculate points for round winner
