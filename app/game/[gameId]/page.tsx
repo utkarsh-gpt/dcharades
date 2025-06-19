@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useSocket } from '@/lib/socket-context';
-import { GameState, Player, DEFAULT_SETTINGS, GameSettings } from '@/lib/types';
-import { getRandomMovie } from '@/lib/movies';
-import GameLobby from '@/components/GameLobby';
-import GamePlay from '@/components/GamePlay';
-import GameSettingsModal from '@/components/GameSettings';
+import { useSocket } from '@/lib/shared/socket-context';
+import { GameState, Player, DEFAULT_SETTINGS, GameSettings } from '@/lib/shared/types';
+import { getRandomMovie } from '@/lib/movies/movies';
+import GameLobby from '@/components/charades/GameLobby';
+import GamePlay from '@/components/charades/GamePlay';
+import GameSettingsModal from '@/components/charades/GameSettings';
 
 export default function GamePage() {
   const params = useParams();
