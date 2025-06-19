@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
-import { SocketProvider } from '@/lib/socket-context'
+import { SocketProvider } from '@/lib/shared/socket-context'
 
 const inter = Inter({ subsets: ['latin'] })
 

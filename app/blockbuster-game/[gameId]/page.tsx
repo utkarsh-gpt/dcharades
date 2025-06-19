@@ -2,25 +2,25 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { io, Socket } from 'socket.io-client';
-import { BlockbusterGameState, Player, Team } from '@/lib/types';
-import BlockbusterLobby from '@/components/BlockbusterLobby';
-import HeadToHeadChallenge from '@/components/HeadToHeadChallenge';
-import MovieSelection from '@/components/MovieSelection';
-import MovieRoundGameplay from '@/components/MovieRoundGameplay';
+import { Socket } from 'socket.io-client';
+import { useSocket } from '@/lib/shared/socket-context';
+import { BlockbusterGameState, Player, Team } from '@/lib/shared/types';
+import BlockbusterLobby from '@/components/blockbuster/BlockbusterLobby';
+import HeadToHeadChallenge from '@/components/blockbuster/HeadToHeadChallenge';
+import MovieSelection from '@/components/movies/MovieSelection';
+import MovieRoundGameplay from '@/components/movies/MovieRoundGameplay';
 
 export default function BlockbusterGameRoom() {
   const params = useParams();
   const router = useRouter();
   const gameId = params.gameId as string;
   
-  const [socket, setSocket] = useState<Socket | null>(null);
+  const { socket, connected } = useSocket();
   const [gameState, setGameState] = useState<BlockbusterGameState | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<Player | null>(null);
-  const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize socket connection
+  // Initialize game connection
   useEffect(() => {
     const playerName = localStorage.getItem('playerName');
     const isHost = localStorage.getItem('isHost') === 'true';
@@ -30,17 +30,10 @@ export default function BlockbusterGameRoom() {
       return;
     }
 
-    const socketUrl = 'http://localhost:3001';
-
-    const newSocket = io(socketUrl);
-    setSocket(newSocket);
-
-    newSocket.on('connect', () => {
-      setIsConnected(true);
-      
+    if (socket && connected) {
       // Join or create game
       if (isHost) {
-        newSocket.emit('create-blockbuster-game', {
+        socket.emit('create-blockbuster-game', {
           gameId,
           playerName,
           settings: {
@@ -54,19 +47,22 @@ export default function BlockbusterGameRoom() {
           }
         });
       } else {
-        newSocket.emit('join-blockbuster-game', {
+        socket.emit('join-blockbuster-game', {
           gameId,
           playerName,
         });
       }
-    });
+    }
+  }, [socket, connected, gameId, router]);
 
-    newSocket.on('disconnect', () => {
-      setIsConnected(false);
-    });
+  // Socket event listeners
+  useEffect(() => {
+    if (!socket) return;
 
-    newSocket.on('blockbuster-game-state', (state: any) => {
+    const handleGameState = (state: any) => {
       setGameState(state);
+      
+      const playerName = localStorage.getItem('playerName');
       
       // Find current player - check both teams and the general players array
       let player = null;
@@ -81,16 +77,20 @@ export default function BlockbusterGameRoom() {
       }
       
       setCurrentPlayer(player || null);
-    });
+    };
 
-    newSocket.on('error', (errorMessage: string) => {
+    const handleError = (errorMessage: string) => {
       setError(errorMessage);
-    });
+    };
+
+    socket.on('blockbuster-game-state', handleGameState);
+    socket.on('error', handleError);
 
     return () => {
-      newSocket.disconnect();
+      socket.off('blockbuster-game-state', handleGameState);
+      socket.off('error', handleError);
     };
-  }, [gameId, router]);
+  }, [socket]);
 
   // Handle team creation
   const handleCreateTeam = useCallback((teamName: string) => {
@@ -208,7 +208,7 @@ export default function BlockbusterGameRoom() {
     );
   }
 
-  if (!isConnected) {
+  if (!connected) {
     return (
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto text-center">
@@ -246,11 +246,11 @@ export default function BlockbusterGameRoom() {
           </p>
           <div className="mt-2 flex justify-center space-x-4">
             <span className={`px-3 py-1 rounded-full text-sm ${
-              isConnected 
+              connected 
                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
                 : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
             }`}>
-              {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+              {connected ? '🟢 Connected' : '🔴 Disconnected'}
             </span>
             <span className="px-3 py-1 rounded-full text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
               Phase: {gameState?.currentPhase || 'unknown'}

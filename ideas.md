@@ -1,6 +1,67 @@
 #Games List:
 
-##1. Uno
+##1. Uno (2-Player Edition with Unique Cards)
+
+**Uno (2-Player Edition with Unique Cards)**
+
+Design and develop an online Uno card game optimized for 2-player gameplay using Next.js and deploy it on Vercel. This version includes traditional Uno cards plus unique cards specifically designed to enhance the strategic depth and excitement of head-to-head matches.
+
+Game Flow:
+
+1. Two players join a game session and are dealt 7 cards each.
+2. The remaining cards form a draw pile, with the top card placed face-up to start the discard pile.
+3. Players take turns matching the top card by color, number, or symbol.
+4. Special action cards and unique 2-player cards add strategic elements to gameplay.
+5. Players must call "Uno" when they have one card remaining.
+6. First player to empty their hand wins the round and scores points based on opponent's remaining cards.
+7. Games can be played to a target score (e.g., 500 points) or as individual rounds.
+
+Unique 2-Player Cards:
+
+1. **Duel Card** - Both players simultaneously reveal their next card. Higher number wins and gets to play again. If tied, both draw 2 cards.
+2. **Mirror Card** - Forces opponent to draw the same number of cards you currently have in your hand.
+3. **Swap Hands** - Exchange your entire hand with your opponent's hand.
+4. **Peek & Pick** - Look at opponent's hand and force them to discard a card of your choice.
+5. **Double Down** - Play two cards of the same number/color simultaneously, opponent draws 4 cards.
+6. **Revenge Card** - Can only be played after opponent uses an action card against you. Doubles the effect back to them.
+7. **Shield Card** - Blocks the next action card played against you and reflects it back to opponent.
+8. **Time Bomb** - Opponent must play a card within 10 seconds or draw 3 cards.
+9. **Lucky Draw** - Draw 3 cards, keep one, opponent draws the other 2.
+10. **Final Stand** - Can only be played when you have 3 or fewer cards. Opponent draws cards equal to your hand size.
+
+Traditional Uno Cards:
+- Number cards (0-9) in four colors (Red, Blue, Green, Yellow)
+- Skip cards (opponent loses their turn)
+- Reverse cards (changes direction - acts as Skip in 2-player)
+- Draw Two cards
+- Wild cards (choose color)
+- Wild Draw Four cards
+
+Game Requirements:
+
+1. Real-time multiplayer support for 2 players with WebSocket connections.
+2. Card validation system to ensure legal plays according to Uno rules.
+3. Timer system for turn management and special card effects.
+4. Visual card animations for drawing, playing, and special effects.
+5. Score tracking across multiple rounds with point calculation.
+6. "Uno" call detection and penalty system for forgetting to call.
+7. Chat system for player communication and trash talk.
+8. Spectator mode for watching ongoing games.
+9. Ranking system based on wins/losses and performance.
+10. Sound effects and visual feedback for card plays and special events.
+
+Technical Requirements:
+
+1. Built using Next.js with TypeScript for type safety and better development experience.
+2. Real-time gameplay using Socket.io for WebSocket connections.
+3. Card game logic with proper shuffling, dealing, and validation systems.
+4. Responsive design optimized for both desktop and mobile play.
+5. State management for game state, player hands, and turn management.
+6. Animation library (Framer Motion) for smooth card transitions and effects.
+7. Deployed on Vercel with serverless functions for game logic.
+
+
+
 ##2. Blockbuster (Bollywood Edition)
 
 **Blockbuster (Bollywood Edition)**
@@ -84,3 +145,47 @@ Technical Requirements:
 3. The app should use WebSockets or WebRTC for real-time communication between the two players.
 4. The app should have a user-friendly interface for selecting game settings, displaying the timer, and facilitating the gameplay.
 5. The app should ensure a smooth and lag-free experience for both players during the game session.
+
+##4. Bollywood Song Guessing Game
+
+**Bollywood Melody Master**
+
+Design and develop a two-player online game where players compete to guess Bollywood songs from audio clips, lyrics, or humming. The game celebrates Indian music culture with multiple rounds of musical challenges.
+
+Game Flow:
+1. Two players join a game session and select difficulty level (90s classics, 2000s hits, recent chartbusters, or mixed).
+2. Players take turns being the "performer" and "guesser" across different challenge types.
+3. Challenge types include: Audio Clip (5-10 second song snippets), Lyric Lines (display 2-3 lines of lyrics), Humming Round (player hums the tune), and Instrumental Only (music without vocals).
+4. Each correct guess earns points, with bonus points for guessing within the first 10 seconds.
+5. Special "Antakshari Round" where players must name a song starting with the last letter of the previous song.
+
+Game Requirements:
+1. Database of popular Bollywood songs across different eras with audio clips, lyrics, and metadata.
+2. Real-time audio streaming capabilities for song clips and player humming.
+3. Timer system with 30-60 second rounds depending on challenge type.
+4. Scoring system with multipliers for quick guesses and difficulty bonuses.
+5. Voice recording functionality for humming rounds.
+
+
+##5. Indian Celebrity Connections
+
+**Filmi Rishta**
+
+A connection-based game where players link Bollywood celebrities, movies, and industry relationships. Players compete to create the longest chains of connections within time limits.
+
+Game Flow:
+1. Players start with a random celebrity name and must create connection chains.
+2. Valid connections include: co-starred in movies, family relationships, director-actor collaborations, or production house associations.
+3. "Six Degrees" challenge to connect two seemingly unrelated celebrities.
+4. "Family Tree" rounds focusing on Bollywood dynasties and relationships.
+5. Bonus points for lesser-known but valid connections.
+
+Game Requirements:
+1. Comprehensive database of Bollywood relationships and collaborations.
+2. Real-time validation of connection claims with supporting evidence.
+3. Visual network display showing connection chains.
+4. Timer-based rounds with increasing complexity.
+5. Hint system for stuck players with point penalties.
+
+
+## 6. 1 second movie guess Bollywood.

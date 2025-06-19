@@ -46,6 +46,18 @@ export default function HomePage() {
       isAvailable: true,
     },
     {
+      id: 'uno',
+      title: 'UNO',
+      description: '2-player UNO with unique strategic cards! Match colors and numbers, use special cards for tactical advantage.',
+      emoji: '🃏',
+      players: '2 Players',
+      duration: '15-30 min',
+      difficulty: 'Medium',
+      category: 'Card Game',
+      route: '/uno',
+      isAvailable: true,
+    },
+    {
       id: 'trivia-battle',
       title: 'Trivia Battle',
       description: 'Test your knowledge across multiple categories in this competitive trivia game.',

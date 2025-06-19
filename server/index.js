@@ -11,13 +11,29 @@ let HEAD_TO_HEAD_CARDS = [];
 let validateMovie = () => true;
 
 try {
-  // Try to load the JavaScript module
-  const cardsPath = path.join(__dirname, '..', 'lib', 'blockbuster-cards.js');
-  if (fs.existsSync(cardsPath)) {
+  // Try to load the JavaScript module from different possible paths
+  const possiblePaths = [
+    path.join(__dirname, '..', 'lib', 'blockbuster', 'blockbuster-cards.js'),
+    path.join(__dirname, 'lib', 'blockbuster', 'blockbuster-cards.js'),
+    path.join(process.cwd(), 'lib', 'blockbuster', 'blockbuster-cards.js'),
+    path.join(__dirname, '..', 'lib', 'blockbuster-cards.js'),
+  ];
+  
+  let cardsPath = null;
+  for (const testPath of possiblePaths) {
+    if (fs.existsSync(testPath)) {
+      cardsPath = testPath;
+      break;
+    }
+  }
+  
+  if (cardsPath) {
     const cards = require(cardsPath);
     HEAD_TO_HEAD_CARDS = cards.HEAD_TO_HEAD_CARDS || [];
     validateMovie = cards.validateMovie || (() => true);
+    console.log(`✅ Loaded blockbuster cards from: ${cardsPath}`);
   } else {
+    console.warn('⚠️ Could not find blockbuster-cards.js file, using fallback cards');
     // Fallback: Define some basic head-to-head cards
     HEAD_TO_HEAD_CARDS = [
       {
@@ -60,8 +76,9 @@ try {
 const server = createServer();
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: process.env.CLIENT_URL || ["http://localhost:3000", "https://*.vercel.app"],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -126,6 +143,216 @@ const DEFAULT_SETTINGS = {
   timeLimit: 300, // 5 minutes
   movieCategories: ['hollywood', 'bollywood'],
 };
+
+// UNO Game Logic
+const DEFAULT_UNO_SETTINGS = {
+  gameType: 'uno',
+  timePerTurn: 30,
+  includeUniqueCards: true,
+  enableChat: true,
+};
+
+// UNO Card Generation
+function createUnoCard(type, color, value, uniqueType = null) {
+  return {
+    id: uuidv4(),
+    type,
+    color,
+    value,
+    uniqueType,
+  };
+}
+
+function generateUnoDeck(includeUniqueCards = true) {
+  const deck = [];
+  const colors = ['red', 'blue', 'green', 'yellow'];
+
+  // Number cards (0-9)
+  colors.forEach(color => {
+    // One 0 card per color
+    deck.push(createUnoCard('number', color, 0));
+    
+    // Two of each number 1-9 per color
+    for (let value = 1; value <= 9; value++) {
+      deck.push(createUnoCard('number', color, value));
+      deck.push(createUnoCard('number', color, value));
+    }
+  });
+
+  // Action cards (2 of each per color)
+  colors.forEach(color => {
+    ['skip', 'reverse', 'draw-two'].forEach(type => {
+      deck.push(createUnoCard(type, color, null));
+      deck.push(createUnoCard(type, color, null));
+    });
+  });
+
+  // Wild cards (4 of each)
+  for (let i = 0; i < 4; i++) {
+    deck.push(createUnoCard('wild', null, null));
+    deck.push(createUnoCard('wild-draw-four', null, null));
+  }
+
+  // Unique cards for 2-player gameplay
+  if (includeUniqueCards) {
+    const uniqueTypes = ['duel', 'mirror', 'swap-hands', 'peek-pick', 'double-down', 'revenge', 'shield', 'time-bomb', 'lucky-draw', 'final-stand'];
+    uniqueTypes.forEach(uniqueType => {
+      deck.push(createUnoCard('unique', null, null, uniqueType));
+      deck.push(createUnoCard('unique', null, null, uniqueType));
+    });
+  }
+
+  return shuffleDeck(deck);
+}
+
+function shuffleDeck(deck) {
+  const shuffled = [...deck];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function dealUnoCards(deck, playerCount) {
+  const playerHands = Array(playerCount).fill().map(() => []);
+  let deckIndex = 0;
+
+  // Deal 7 cards to each player
+  for (let cardNum = 0; cardNum < 7; cardNum++) {
+    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
+      playerHands[playerIndex].push(deck[deckIndex]);
+      deckIndex++;
+    }
+  }
+
+  // Find a valid start card (number card)
+  let startCardIndex = deckIndex;
+  while (startCardIndex < deck.length && deck[startCardIndex].type !== 'number') {
+    startCardIndex++;
+  }
+
+  if (startCardIndex >= deck.length) {
+    startCardIndex = deckIndex; // Use first available card if no number found
+  }
+
+  const startCard = deck[startCardIndex];
+  const remainingDeck = [
+    ...deck.slice(deckIndex, startCardIndex),
+    ...deck.slice(startCardIndex + 1)
+  ];
+
+  return { playerHands, remainingDeck, startCard };
+}
+
+function createUnoGame(gameId, hostPlayer, settings) {
+  const deck = generateUnoDeck(settings.includeUniqueCards);
+  const { playerHands, remainingDeck, startCard } = dealUnoCards(deck, 1);
+
+  return {
+    id: gameId,
+    players: [{ 
+      ...hostPlayer, 
+      hand: playerHands[0], 
+      score: 0, 
+      hasCalledUno: false, 
+      shieldActive: false 
+    }],
+    settings,
+    currentPhase: 'lobby',
+    currentPlayerIndex: 0,
+    direction: 1,
+    drawPile: remainingDeck,
+    discardPile: [startCard],
+    currentColor: startCard.color,
+    skipNext: false,
+    drawCount: 0,
+    isActive: false,
+    isGameStarted: false,
+    winner: null,
+    roundWinner: null,
+    timeRemaining: settings.timePerTurn,
+    specialEffectActive: { type: null, playerId: null, timeRemaining: 0 },
+    gameHistory: [],
+    turnTimer: null,
+  };
+}
+
+function canPlayUnoCard(card, topCard, currentColor) {
+  if (card.type === 'wild' || card.type === 'wild-draw-four') return true;
+  if (card.type === 'unique') return true;
+  if (card.color === currentColor || card.color === topCard.color) return true;
+  if (card.type === 'number' && topCard.type === 'number' && card.value === topCard.value) return true;
+  if (card.type === topCard.type && card.type !== 'number') return true;
+  return false;
+}
+
+function drawUnoCards(game, player, count) {
+  const drawnCards = [];
+  for (let i = 0; i < count; i++) {
+    if (game.drawPile.length === 0) {
+      reshuffleUnoDiscardPile(game);
+    }
+    if (game.drawPile.length > 0) {
+      const card = game.drawPile.pop();
+      player.hand.push(card);
+      drawnCards.push(card);
+    }
+  }
+  return drawnCards;
+}
+
+function reshuffleUnoDiscardPile(game) {
+  if (game.discardPile.length <= 1) return;
+  const topCard = game.discardPile[0];
+  const cardsToShuffle = game.discardPile.slice(1);
+  game.drawPile = shuffleDeck(cardsToShuffle);
+  game.discardPile = [topCard];
+}
+
+function advanceUnoTurn(game) {
+  if (game.skipNext) {
+    game.skipNext = false;
+    return; // Same player goes again in 2-player
+  }
+  game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
+  game.timeRemaining = game.settings.timePerTurn;
+}
+
+function startUnoTurnTimer(gameId) {
+  const game = games.get(gameId);
+  if (!game || game.settings.timePerTurn === 0) return;
+
+  if (game.turnTimer) {
+    clearInterval(game.turnTimer);
+  }
+
+  game.turnTimer = setInterval(() => {
+    game.timeRemaining--;
+    
+    if (game.timeRemaining <= 0) {
+      // Auto-draw card and advance turn
+      const currentPlayer = game.players[game.currentPlayerIndex];
+      drawUnoCards(game, currentPlayer, 1);
+      advanceUnoTurn(game);
+      
+      if (game.settings.timePerTurn > 0) {
+        startUnoTurnTimer(gameId);
+      }
+      
+      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    } else {
+      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    }
+  }, 1000);
+}
+
+function getUnoGameStateForClient(game) {
+  return {
+    ...game,
+    turnTimer: undefined, // Don't send timer to client
+  };
+}
 
 // Head-to-Head Helper Functions
 function getRandomHeadToHeadCard() {
@@ -1222,6 +1449,268 @@ io.on('connection', (socket) => {
       console.error('Error handling head-to-head turn:', error);
       socket.emit('error', 'Failed to complete turn');
     }
+  });
+
+  // UNO Game Event Handlers
+  socket.on('join-uno-game', ({ gameId, playerName, isHost }) => {
+    try {
+      let game = games.get(gameId);
+      
+      // Check if player is already in this game
+      if (game && game.players.find(p => p.id === socket.id)) {
+        socket.join(gameId);
+        socket.emit('unoGameState', getUnoGameStateForClient(game));
+        return;
+      }
+      
+      if (!game) {
+        if (!isHost) {
+          socket.emit('error', 'Game not found');
+          return;
+        }
+        
+        // Create new UNO game
+        const hostPlayer = {
+          id: socket.id,
+          name: playerName,
+          isHost: true,
+          isReady: false,
+        };
+        
+        game = createUnoGame(gameId, hostPlayer, DEFAULT_UNO_SETTINGS);
+        games.set(gameId, game);
+        playerSockets.set(socket.id, { gameId, playerId: socket.id });
+      } else {
+        // Join existing UNO game
+        if (game.players.length >= 2) {
+          socket.emit('error', 'Game is full');
+          return;
+        }
+        
+        const deck = generateUnoDeck(game.settings.includeUniqueCards);
+        const { playerHands } = dealUnoCards(deck, 2);
+        
+        const player = {
+          id: socket.id,
+          name: playerName,
+          isHost: false,
+          isReady: false,
+          hand: playerHands[1],
+          score: 0,
+          hasCalledUno: false,
+          shieldActive: false,
+        };
+        
+        game.players.push(player);
+        // Update first player's hand
+        game.players[0].hand = playerHands[0];
+        
+        playerSockets.set(socket.id, { gameId, playerId: socket.id });
+      }
+      
+      socket.join(gameId);
+      socket.emit('unoGameState', getUnoGameStateForClient(game));
+      socket.to(gameId).emit('unoPlayerJoined', game.players.find(p => p.id === socket.id));
+      
+    } catch (error) {
+      console.error('Error joining UNO game:', error);
+      socket.emit('error', 'Failed to join game');
+    }
+  });
+
+  socket.on('update-uno-settings', ({ gameId, settings }) => {
+    const game = games.get(gameId);
+    if (!game || game.settings.gameType !== 'uno') return;
+    
+    const player = game.players.find(p => p.id === socket.id);
+    if (!player || !player.isHost) return;
+    
+    game.settings = { ...game.settings, ...settings };
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+  });
+
+  socket.on('uno-player-ready', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (!game || game.settings.gameType !== 'uno') return;
+    
+    const player = game.players.find(p => p.id === socket.id);
+    if (!player) return;
+    
+    player.isReady = !player.isReady;
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+  });
+
+  socket.on('start-uno-game', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (!game || game.settings.gameType !== 'uno') return;
+    
+    const player = game.players.find(p => p.id === socket.id);
+    if (!player || !player.isHost) return;
+    
+    if (game.players.length !== 2 || !game.players.every(p => p.isReady)) {
+      socket.emit('error', 'All players must be ready');
+      return;
+    }
+    
+    // Start the game
+    game.isGameStarted = true;
+    game.isActive = true;
+    game.currentPhase = 'playing';
+    game.currentPlayerIndex = 0;
+    
+    // Re-deal cards for fresh start
+    const deck = generateUnoDeck(game.settings.includeUniqueCards);
+    const { playerHands, remainingDeck, startCard } = dealUnoCards(deck, 2);
+    
+    game.players[0].hand = playerHands[0];
+    game.players[1].hand = playerHands[1];
+    game.drawPile = remainingDeck;
+    game.discardPile = [startCard];
+    game.currentColor = startCard.color;
+    
+    startUnoTurnTimer(gameId);
+    io.to(gameId).emit('unoGameStarted');
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+  });
+
+  socket.on('play-uno-card', ({ gameId, cardId, chosenColor }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || !game.isActive || game.settings.gameType !== 'uno') {
+        socket.emit('error', 'Game not active');
+        return;
+      }
+      
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || game.players[game.currentPlayerIndex].id !== socket.id) {
+        socket.emit('error', 'Not your turn');
+        return;
+      }
+      
+      const cardIndex = player.hand.findIndex(c => c.id === cardId);
+      if (cardIndex === -1) {
+        socket.emit('error', 'Card not found');
+        return;
+      }
+      
+      const card = player.hand[cardIndex];
+      const topCard = game.discardPile[0];
+      
+      if (!canPlayUnoCard(card, topCard, game.currentColor)) {
+        socket.emit('error', 'Invalid card play');
+        return;
+      }
+      
+      // Remove card from player's hand
+      player.hand.splice(cardIndex, 1);
+      
+      // Add card to discard pile
+      game.discardPile.unshift(card);
+      
+      // Update current color
+      if (card.type === 'wild' || card.type === 'wild-draw-four') {
+        game.currentColor = chosenColor || 'red';
+      } else {
+        game.currentColor = card.color;
+      }
+      
+      // Handle card effects
+      switch (card.type) {
+        case 'skip':
+          game.skipNext = true;
+          break;
+        case 'reverse':
+          // In 2-player game, reverse acts like skip
+          game.skipNext = true;
+          break;
+        case 'draw-two':
+          const nextPlayer = game.players[(game.currentPlayerIndex + 1) % game.players.length];
+          drawUnoCards(game, nextPlayer, 2);
+          game.skipNext = true;
+          break;
+        case 'wild-draw-four':
+          const targetPlayer = game.players[(game.currentPlayerIndex + 1) % game.players.length];
+          drawUnoCards(game, targetPlayer, 4);
+          game.skipNext = true;
+          break;
+      }
+      
+      // Check for UNO (1 card left)
+      if (player.hand.length === 1 && !player.hasCalledUno) {
+        // Penalty for not calling UNO
+        drawUnoCards(game, player, 2);
+      }
+      
+      // Check for win condition
+      if (player.hand.length === 0) {
+        game.winner = player.id;
+        game.roundWinner = player;
+        game.isActive = false;
+        if (game.turnTimer) {
+          clearInterval(game.turnTimer);
+        }
+        io.to(gameId).emit('unoGameEnded', player);
+      } else {
+        // Continue game
+        advanceUnoTurn(game);
+        if (game.settings.timePerTurn > 0) {
+          startUnoTurnTimer(gameId);
+        }
+      }
+      
+      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      
+    } catch (error) {
+      console.error('Error playing UNO card:', error);
+      socket.emit('error', 'Failed to play card');
+    }
+  });
+
+  socket.on('draw-uno-card', ({ gameId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || !game.isActive || game.settings.gameType !== 'uno') {
+        socket.emit('error', 'Game not active');
+        return;
+      }
+      
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || game.players[game.currentPlayerIndex].id !== socket.id) {
+        socket.emit('error', 'Not your turn');
+        return;
+      }
+      
+      const drawnCards = drawUnoCards(game, player, 1);
+      
+      // Player can choose to play the drawn card if it's valid
+      const topCard = game.discardPile[0];
+      const canPlay = drawnCards.length > 0 && canPlayUnoCard(drawnCards[0], topCard, game.currentColor);
+      
+      if (!canPlay) {
+        // Must pass turn
+        advanceUnoTurn(game);
+        if (game.settings.timePerTurn > 0) {
+          startUnoTurnTimer(gameId);
+        }
+      }
+      
+      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      
+    } catch (error) {
+      console.error('Error drawing UNO card:', error);
+      socket.emit('error', 'Failed to draw card');
+    }
+  });
+
+  socket.on('call-uno', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (!game || game.settings.gameType !== 'uno') return;
+    
+    const player = game.players.find(p => p.id === socket.id);
+    if (!player || player.hand.length !== 1) return;
+    
+    player.hasCalledUno = true;
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
   });
 
   socket.on('leave-game', ({ gameId }) => {
