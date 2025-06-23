@@ -140,15 +140,7 @@ export default function HomePage() {
             Choose from our collection of fun multiplayer games to play with friends!
           </p>
           
-          {/* Demo Link */}
-          <div className="mb-8">
-            <button
-              onClick={() => router.push('/movie-demo')}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 text-sm font-medium"
-            >
-              🎬 View Movie Selection Demo
-            </button>
-          </div>
+
           
           {/* Category Filter */}
           <div className="flex flex-wrap justify-center gap-2 mb-8">
