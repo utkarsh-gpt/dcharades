@@ -1,8 +1,5 @@
 {
-  "/not-found": "app/not-found.js",
-  "/uno-game/[gameId]/page": "app/uno-game/[gameId]/page.js",
-  "/uno/page": "app/uno/page.js",
-  "/blockbuster-game/[gameId]/page": "app/blockbuster-game/[gameId]/page.js",
   "/page": "app/page.js",
-  "/blockbuster/page": "app/blockbuster/page.js"
+  "/uno-game/[gameId]/page": "app/uno-game/[gameId]/page.js",
+  "/uno/page": "app/uno/page.js"
 }

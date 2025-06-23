@@ -15,7 +15,12 @@ const {
 const server = createServer();
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || ["http://localhost:3000", "https://*.vercel.app"],
+    origin: process.env.CLIENT_URL || [
+      "http://localhost:3000", 
+      "https://*.vercel.app",
+      "https://*.render.com",
+      "https://*.onrender.com"
+    ],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -1674,6 +1679,7 @@ function handlePlayerLeave(socketId, gameId) {
 }
 
 const PORT = process.env.PORT || 3001;
+const HOST = process.env.HOST || '0.0.0.0';
 
 // Initialize database and start server
 async function startServer() {
@@ -1681,12 +1687,13 @@ async function startServer() {
     // Initialize database first
     await initializeDatabase();
 
-server.listen(PORT).on('error', (err) => {
-  if (err.code === 'EADDRINUSE') {
-    server.listen(PORT + 1);
-  }
-}); 
+    // Listen on all interfaces (0.0.0.0) for cloud deployment
+    server.listen(PORT, HOST, () => {
+      console.log(`Server running on ${HOST}:${PORT}`);
+    });
+    
   } catch (error) {
+    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
