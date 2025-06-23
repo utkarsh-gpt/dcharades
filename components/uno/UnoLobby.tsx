@@ -1,10 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { UnoGameState, UnoPlayer } from '@/lib/uno/types';
+import { UnoGameStateClient, UnoPlayer } from '@/lib/uno/types';
 
 interface UnoLobbyProps {
-  gameState: UnoGameState;
+  gameState: UnoGameStateClient;
   currentPlayer: UnoPlayer | null;
   onStartGame: () => void;
   onPlayerReady: () => void;
@@ -21,7 +21,7 @@ export default function UnoLobby({
   const [showGameId, setShowGameId] = useState(false);
 
   const isHost = currentPlayer?.id === gameState.players[0]?.id;
-  const canStartGame = gameState.players.length === 2 && gameState.players.every(p => p.isReady);
+  const canStartGame = gameState.players.length === 2;
 
   const handleCopyGameId = () => {
     navigator.clipboard.writeText(gameId);
@@ -42,7 +42,7 @@ export default function UnoLobby({
               onClick={handleCopyGameId}
               className="text-sm font-mono bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 px-3 py-1 rounded-md transition-colors"
             >
-              {showGameId ? 'Copied!' : `ID: ${gameId.slice(0, 8)}`}
+              {showGameId ? 'Copied!' : `ID: ${gameId.slice(0, 5)}`}
             </button>
           </div>
           
@@ -50,18 +50,10 @@ export default function UnoLobby({
             {gameState.players.map((player, index) => (
               <div
                 key={player.id}
-                className={`flex items-center justify-between p-3 rounded-lg border-2 ${
-                  player.isReady
-                    ? 'border-game-secondary bg-green-50 dark:bg-green-900/20'
-                    : 'border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
-                }`}
+                className="flex items-center justify-between p-3 rounded-lg border-2 border-game-secondary bg-green-50 dark:bg-green-900/20"
               >
                 <div className="flex items-center space-x-3">
-                  <div
-                    className={`w-3 h-3 rounded-full ${
-                      player.isReady ? 'bg-game-secondary' : 'bg-gray-400'
-                    }`}
-                  />
+                  <div className="w-3 h-3 rounded-full bg-game-secondary" />
                   <span className="font-medium text-gray-800 dark:text-white">
                     {player.name}
                   </span>
@@ -77,7 +69,7 @@ export default function UnoLobby({
                   )}
                 </div>
                 <span className="text-sm text-gray-600 dark:text-gray-400">
-                  {player.isReady ? '✅ Ready' : '⏳ Not Ready'}
+                  ✅ Connected
                 </span>
               </div>
             ))}
@@ -97,19 +89,11 @@ export default function UnoLobby({
             )}
           </div>
 
-          {/* Ready Button */}
+          {/* Connection Status */}
           <div className="mt-6">
-            <button
-              onClick={onPlayerReady}
-              disabled={currentPlayer?.isReady}
-              className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                currentPlayer?.isReady
-                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                  : 'btn-secondary'
-              }`}
-            >
-              {currentPlayer?.isReady ? '✅ Ready!' : 'Ready to Play'}
-            </button>
+            <div className="w-full py-3 rounded-lg font-semibold text-center bg-green-100 dark:bg-green-900/20 text-green-800 dark:text-green-200">
+              ✅ Connected - Game will start automatically
+            </div>
           </div>
         </div>
 
@@ -144,26 +128,14 @@ export default function UnoLobby({
             </div>
           </div>
 
-          {/* Start Game Button */}
-          {isHost && (
-            <div className="mt-6">
-              <button
-                onClick={onStartGame}
-                disabled={!canStartGame}
-                className={`w-full py-3 rounded-lg font-semibold transition-colors ${
-                  canStartGame
-                    ? 'btn-primary'
-                    : 'bg-gray-400 text-gray-600 cursor-not-allowed'
-                }`}
-              >
-                {!canStartGame
-                  ? gameState.players.length < 2
-                    ? 'Waiting for Players'
-                    : 'Waiting for All Players to be Ready'
-                  : 'Start Game!'}
-              </button>
+          {/* Auto-start message */}
+          <div className="mt-6">
+            <div className="w-full py-3 rounded-lg font-semibold text-center bg-blue-100 dark:bg-blue-900/20 text-blue-800 dark:text-blue-200">
+              {gameState.players.length < 2
+                ? 'Waiting for another player to join...'
+                : 'Game will start automatically!'}
             </div>
-          )}
+          </div>
         </div>
       </div>
 

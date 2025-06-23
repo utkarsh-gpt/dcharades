@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { io, Socket } from 'socket.io-client';
-import { UnoGameState, UnoPlayer, UnoGameEvent, UnoCard, DEFAULT_UNO_SETTINGS } from '@/lib/uno/types';
+import { UnoGameStateClient, UnoPlayer, UnoGameEvent, UnoCard, DEFAULT_UNO_SETTINGS } from '@/lib/uno/types';
 import UnoGameBoard from '@/components/uno/UnoGameBoard';
 // import UnoLobby from '@/components/uno/UnoLobby';
 
@@ -13,7 +13,7 @@ export default function UnoGamePage() {
   const gameId = params.gameId as string;
   
   const [socket, setSocket] = useState<Socket | null>(null);
-  const [gameState, setGameState] = useState<UnoGameState | null>(null);
+  const [gameState, setGameState] = useState<UnoGameStateClient | null>(null);
   const [currentPlayer, setCurrentPlayer] = useState<UnoPlayer | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting');
   const [error, setError] = useState<string | null>(null);
@@ -57,29 +57,42 @@ export default function UnoGamePage() {
       setError('Failed to connect to game server');
     });
 
-    newSocket.on('unoGameState', (state: UnoGameState) => {
-      console.log('Game state updated:', state);
+    newSocket.on('unoGameState', (state: UnoGameStateClient) => {
       setGameState(state);
       
-      // Find current player by socket ID
-      const player = state.players.find(p => p.id === newSocket.id);
-      setCurrentPlayer(player || null);
+      // Find current player by socket ID  
+      const player = state.players.find((p: any) => p.id === newSocket.id);
+      if (player) {
+        // Create a UnoPlayer object with the hand from playerHand
+        const currentPlayerData: UnoPlayer = {
+          id: player.id,
+          name: player.name,
+          hand: state.playerHand || [],
+          score: player.score,
+          isReady: player.isReady,
+          isHost: player.isHost,
+          hasCalledUno: player.hasCalledUno,
+          shieldActive: player.shieldActive,
+        };
+        setCurrentPlayer(currentPlayerData);
+      } else {
+        setCurrentPlayer(null);
+      }
     });
 
     newSocket.on('unoPlayerJoined', (player: UnoPlayer) => {
-      console.log('Player joined:', player);
+      // Player joined
     });
 
     newSocket.on('unoGameStarted', () => {
-      console.log('UNO Game started!');
+      // Game started
     });
 
     newSocket.on('unoGameEnded', (winner: UnoPlayer) => {
-      console.log('UNO Game ended, winner:', winner);
+      // Game ended
     });
 
     newSocket.on('error', (errorMessage: string) => {
-      console.error('Game error:', errorMessage);
       setError(errorMessage);
     });
 
@@ -145,19 +158,17 @@ export default function UnoGamePage() {
     });
   }, [socket, currentPlayer, gameId]);
 
-  const handleStartGame = useCallback(() => {
-    if (!socket) return;
-    
-    socket.emit('start-uno-game', { gameId });
-  }, [socket, gameId]);
-
-  const handlePlayerReady = useCallback(() => {
+  const handleBlockUno = useCallback(() => {
     if (!socket || !currentPlayer) return;
     
-    socket.emit('uno-player-ready', {
+    socket.emit('block-uno', {
       gameId,
     });
   }, [socket, currentPlayer, gameId]);
+
+
+
+  // Removed handleStartGame and handlePlayerReady as they're no longer needed
 
   const handleSendChatMessage = useCallback((message: string) => {
     if (!socket || !currentPlayer) return;
@@ -218,22 +229,11 @@ export default function UnoGamePage() {
         <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Game Lobby</h2>
           <p className="text-gray-600 mb-4">Players: {gameState.players.length}/2</p>
-          {currentPlayer?.isHost && gameState.players.length === 2 && (
-            <button 
-              onClick={handleStartGame}
-              className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg"
-            >
-              Start Game
-            </button>
-          )}
-          {!currentPlayer?.isReady && (
-            <button 
-              onClick={handlePlayerReady}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg mr-2"
-            >
-              Ready
-            </button>
-          )}
+          <div className="text-blue-600 font-medium">
+            {gameState.players.length < 2 
+              ? 'Waiting for another player to join...' 
+              : 'Game will start automatically!'}
+          </div>
         </div>
       </div>
     );
@@ -246,6 +246,7 @@ export default function UnoGamePage() {
       onPlayCard={handlePlayCard}
       onDrawCard={handleDrawCard}
       onCallUno={handleCallUno}
+      onBlockUno={handleBlockUno}
       onSendChatMessage={handleSendChatMessage}
     />
   );

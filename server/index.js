@@ -2,76 +2,15 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 
-// Import head-to-head cards and validation
-const path = require('path');
-const fs = require('fs');
-
-// Load head-to-head cards from the lib directory
-let HEAD_TO_HEAD_CARDS = [];
-let validateMovie = () => true;
-
-try {
-  // Try to load the JavaScript module from different possible paths
-  const possiblePaths = [
-    path.join(__dirname, '..', 'lib', 'blockbuster', 'blockbuster-cards.js'),
-    path.join(__dirname, 'lib', 'blockbuster', 'blockbuster-cards.js'),
-    path.join(process.cwd(), 'lib', 'blockbuster', 'blockbuster-cards.js'),
-    path.join(__dirname, '..', 'lib', 'blockbuster-cards.js'),
-  ];
-  
-  let cardsPath = null;
-  for (const testPath of possiblePaths) {
-    if (fs.existsSync(testPath)) {
-      cardsPath = testPath;
-      break;
-    }
-  }
-  
-  if (cardsPath) {
-    const cards = require(cardsPath);
-    HEAD_TO_HEAD_CARDS = cards.HEAD_TO_HEAD_CARDS || [];
-    validateMovie = cards.validateMovie || (() => true);
-    console.log(`✅ Loaded blockbuster cards from: ${cardsPath}`);
-  } else {
-    console.warn('⚠️ Could not find blockbuster-cards.js file, using fallback cards');
-    // Fallback: Define some basic head-to-head cards
-    HEAD_TO_HEAD_CARDS = [
-      {
-        id: 'sports-1',
-        category: 'Sports Movies',
-        description: 'Name Bollywood movies about sports',
-        examples: ['Dangal', 'Sultan', 'Mary Kom', 'Bhaag Milkha Bhaag', 'MS Dhoni']
-      },
-      {
-        id: 'romance-1',
-        category: 'Romance Movies',
-        description: 'Name Bollywood romantic movies',
-        examples: ['Dilwale Dulhania Le Jayenge', 'Kuch Kuch Hota Hai', 'Jab We Met', 'Yeh Jawaani Hai Deewani']
-      },
-      {
-        id: 'action-1',
-        category: 'Action Movies',
-        description: 'Name Bollywood action movies',
-        examples: ['War', 'Baaghi', 'Don', 'Dhoom', 'Singham']
-      },
-      {
-        id: 'comedy-1',
-        category: 'Comedy Movies',
-        description: 'Name Bollywood comedy movies',
-        examples: ['3 Idiots', 'Golmaal', 'Housefull', 'Hera Pheri', 'Welcome']
-      },
-      {
-        id: 'shahrukh-1',
-        category: 'Shah Rukh Khan Movies',
-        description: 'Name movies starring Shah Rukh Khan',
-        examples: ['Chennai Express', 'Happy New Year', 'My Name is Khan', 'Om Shanti Om']
-      }
-    ];
-  }
-} catch (error) {
-  console.warn('Could not load blockbuster cards, using fallback:', error.message);
-  // Use fallback cards defined above
-}
+// Import database functions
+const {
+  initializeDatabase,
+  getRandomMovies,
+  getRandomHeadToHeadCard: getRandomHeadToHeadCardFromDB,
+  findMovieByTitle,
+  getMoviesByGenre,
+  getAllMovies
+} = require('./db');
 
 const server = createServer();
 const io = new Server(server, {
@@ -86,58 +25,6 @@ const io = new Server(server, {
 const games = new Map();
 const playerSockets = new Map();
 
-// Movie database with genres
-const MOVIES = [
-  // Hollywood Movies
-  { title: "Titanic", category: "hollywood", difficulty: "easy", genre: "Romance" },
-  { title: "Avatar", category: "hollywood", difficulty: "easy", genre: "Sci-Fi" },
-  { title: "The Lion King", category: "hollywood", difficulty: "easy", genre: "Animation" },
-  { title: "Finding Nemo", category: "hollywood", difficulty: "easy", genre: "Animation" },
-  { title: "Spider-Man", category: "hollywood", difficulty: "easy", genre: "Action" },
-  { title: "Batman", category: "hollywood", difficulty: "easy", genre: "Action" },
-  { title: "Superman", category: "hollywood", difficulty: "easy", genre: "Action" },
-  { title: "Frozen", category: "hollywood", difficulty: "easy", genre: "Animation" },
-  { title: "Shrek", category: "hollywood", difficulty: "easy", genre: "Animation" },
-  { title: "Cars", category: "hollywood", difficulty: "easy", genre: "Animation" },
-  { title: "The Shawshank Redemption", category: "hollywood", difficulty: "medium", genre: "Drama" },
-  { title: "The Godfather", category: "hollywood", difficulty: "medium", genre: "Crime" },
-  { title: "Pulp Fiction", category: "hollywood", difficulty: "medium", genre: "Crime" },
-  { title: "The Dark Knight", category: "hollywood", difficulty: "medium", genre: "Action" },
-  { title: "Forrest Gump", category: "hollywood", difficulty: "medium", genre: "Drama" },
-  { title: "Inception", category: "hollywood", difficulty: "medium", genre: "Sci-Fi" },
-  { title: "The Matrix", category: "hollywood", difficulty: "medium", genre: "Sci-Fi" },
-  { title: "Jurassic Park", category: "hollywood", difficulty: "medium", genre: "Adventure" },
-  { title: "Star Wars", category: "hollywood", difficulty: "medium", genre: "Sci-Fi" },
-  { title: "The Avengers", category: "hollywood", difficulty: "medium", genre: "Action" },
-  
-  // Bollywood Movies
-  { title: "Sholay", category: "bollywood", difficulty: "easy", genre: "Action" },
-  { title: "Dilwale Dulhania Le Jayenge", category: "bollywood", difficulty: "easy", genre: "Romance" },
-  { title: "3 Idiots", category: "bollywood", difficulty: "easy", genre: "Comedy" },
-  { title: "Dangal", category: "bollywood", difficulty: "easy", genre: "Sports" },
-  { title: "Baahubali", category: "bollywood", difficulty: "easy", genre: "Action" },
-  { title: "PK", category: "bollywood", difficulty: "easy", genre: "Comedy" },
-  { title: "Sultan", category: "bollywood", difficulty: "easy", genre: "Sports" },
-  { title: "Singham", category: "bollywood", difficulty: "easy", genre: "Action" },
-  { title: "Chennai Express", category: "bollywood", difficulty: "easy", genre: "Comedy" },
-  { title: "Krrish", category: "bollywood", difficulty: "easy", genre: "Sci-Fi" },
-  { title: "Zindagi Na Milegi Dobara", category: "bollywood", difficulty: "medium", genre: "Drama" },
-  { title: "Queen", category: "bollywood", difficulty: "medium", genre: "Comedy" },
-  { title: "Pink", category: "bollywood", difficulty: "medium", genre: "Social" },
-  { title: "Article 15", category: "bollywood", difficulty: "medium", genre: "Social" },
-  { title: "Andhadhun", category: "bollywood", difficulty: "medium", genre: "Thriller" },
-  { title: "Lagaan", category: "bollywood", difficulty: "easy", genre: "Historical" },
-  { title: "Taare Zameen Par", category: "bollywood", difficulty: "easy", genre: "Drama" },
-  { title: "My Name is Khan", category: "bollywood", difficulty: "easy", genre: "Drama" },
-  { title: "Yeh Jawaani Hai Deewani", category: "bollywood", difficulty: "easy", genre: "Romance" },
-  { title: "Bajrangi Bhaijaan", category: "bollywood", difficulty: "easy", genre: "Drama" },
-  { title: "War", category: "bollywood", difficulty: "easy", genre: "Action" },
-  { title: "Gully Boy", category: "bollywood", difficulty: "easy", genre: "Drama" },
-  { title: "URI", category: "bollywood", difficulty: "easy", genre: "Action" },
-  { title: "Stree", category: "bollywood", difficulty: "medium", genre: "Horror-Comedy" },
-  { title: "Raazi", category: "bollywood", difficulty: "medium", genre: "Thriller" },
-];
-
 const DEFAULT_SETTINGS = {
   rounds: 5,
   timeLimit: 300, // 5 minutes
@@ -147,14 +34,14 @@ const DEFAULT_SETTINGS = {
 // UNO Game Logic
 const DEFAULT_UNO_SETTINGS = {
   gameType: 'uno',
-  timePerTurn: 30,
+  timePerTurn: 0, // No time limit
   includeUniqueCards: true,
   enableChat: true,
 };
 
 // UNO Card Generation
 function createUnoCard(type, color, value, uniqueType = null) {
-  return {
+    return {
     id: uuidv4(),
     type,
     color,
@@ -214,186 +101,119 @@ function shuffleDeck(deck) {
   return shuffled;
 }
 
-function dealUnoCards(deck, playerCount) {
-  const playerHands = Array(playerCount).fill().map(() => []);
-  let deckIndex = 0;
-
-  // Deal 7 cards to each player
-  for (let cardNum = 0; cardNum < 7; cardNum++) {
-    for (let playerIndex = 0; playerIndex < playerCount; playerIndex++) {
-      playerHands[playerIndex].push(deck[deckIndex]);
-      deckIndex++;
-    }
+// Database-powered movie functions
+async function getRandomMovieCards(count = 6, filters = {}) {
+  try {
+    const movies = await getRandomMovies(count, filters);
+    return movies.map(movie => ({
+      id: movie.id.toString(),
+      title: movie.title,
+      genre: movie.genre,
+      category: movie.category,
+      difficulty: movie.difficulty
+    }));
+  } catch (error) {
+    return [];
   }
-
-  // Find a valid start card (number card)
-  let startCardIndex = deckIndex;
-  while (startCardIndex < deck.length && deck[startCardIndex].type !== 'number') {
-    startCardIndex++;
-  }
-
-  if (startCardIndex >= deck.length) {
-    startCardIndex = deckIndex; // Use first available card if no number found
-  }
-
-  const startCard = deck[startCardIndex];
-  const remainingDeck = [
-    ...deck.slice(deckIndex, startCardIndex),
-    ...deck.slice(startCardIndex + 1)
-  ];
-
-  return { playerHands, remainingDeck, startCard };
 }
 
-function createUnoGame(gameId, hostPlayer, settings) {
-  const deck = generateUnoDeck(settings.includeUniqueCards);
-  const { playerHands, remainingDeck, startCard } = dealUnoCards(deck, 1);
+async function getRandomHeadToHeadCard() {
+  try {
+    const card = await getRandomHeadToHeadCardFromDB();
+    return card ? {
+      id: card.id,
+      category: card.category,
+      description: card.description,
+      examples: []
+    } : null;
+  } catch (error) {
+    return null;
+  }
+}
 
-  return {
+// Blockbuster Game Functions
+function createGame(gameId, hostPlayer) {
+  const game = {
     id: gameId,
-    players: [{ 
-      ...hostPlayer, 
-      hand: playerHands[0], 
-      score: 0, 
-      hasCalledUno: false, 
-      shieldActive: false 
-    }],
-    settings,
+    teams: [],
+    settings: {
+      rounds: 3,
+      timeLimit: 0,
+      movieCategories: ['bollywood'],
+      gameType: 'blockbuster',
+      maxPlayersPerTeam: 6,
+      headToHeadTime: 45,
+      movieRoundTime: 60,
+    },
     currentPhase: 'lobby',
-    currentPlayerIndex: 0,
-    direction: 1,
-    drawPile: remainingDeck,
-    discardPile: [startCard],
-    currentColor: startCard.color,
-    skipNext: false,
-    drawCount: 0,
+    headToHead: {
+      isActive: false,
+      card: null,
+      currentPlayers: { teamA: null, teamB: null },
+      timeRemaining: 0,
+      submissions: [],
+      winner: null,
+      isReady: false,
+      countdownActive: false,
+      countdownTime: 0,
+    },
+    movieCards: [],
+    currentPlayerAssignments: {},
+    currentRoundPlayer: null,
+    currentField: null,
+    timeRemaining: 0,
     isActive: false,
     isGameStarted: false,
     winner: null,
-    roundWinner: null,
-    timeRemaining: settings.timePerTurn,
-    specialEffectActive: { type: null, playerId: null, timeRemaining: 0 },
-    gameHistory: [],
-    turnTimer: null,
+    roundHistory: [],
+    // Add compatibility fields for existing functions
+    players: [hostPlayer],
+    currentRound: 0,
+    currentActorId: null,
+    currentGuesser: null,
+    currentMovie: null,
+    isRoundActive: false,
+    roundTimer: null,
+    headToHeadTimer: null,
+    countdownTimer: null,
   };
-}
 
-function canPlayUnoCard(card, topCard, currentColor) {
-  if (card.type === 'wild' || card.type === 'wild-draw-four') return true;
-  if (card.type === 'unique') return true;
-  if (card.color === currentColor || card.color === topCard.color) return true;
-  if (card.type === 'number' && topCard.type === 'number' && card.value === topCard.value) return true;
-  if (card.type === topCard.type && card.type !== 'number') return true;
-  return false;
-}
-
-function drawUnoCards(game, player, count) {
-  const drawnCards = [];
-  for (let i = 0; i < count; i++) {
-    if (game.drawPile.length === 0) {
-      reshuffleUnoDiscardPile(game);
-    }
-    if (game.drawPile.length > 0) {
-      const card = game.drawPile.pop();
-      player.hand.push(card);
-      drawnCards.push(card);
-    }
-  }
-  return drawnCards;
-}
-
-function reshuffleUnoDiscardPile(game) {
-  if (game.discardPile.length <= 1) return;
-  const topCard = game.discardPile[0];
-  const cardsToShuffle = game.discardPile.slice(1);
-  game.drawPile = shuffleDeck(cardsToShuffle);
-  game.discardPile = [topCard];
-}
-
-function advanceUnoTurn(game) {
-  if (game.skipNext) {
-    game.skipNext = false;
-    return; // Same player goes again in 2-player
-  }
-  game.currentPlayerIndex = (game.currentPlayerIndex + 1) % game.players.length;
-  game.timeRemaining = game.settings.timePerTurn;
-}
-
-function startUnoTurnTimer(gameId) {
-  const game = games.get(gameId);
-  if (!game || game.settings.timePerTurn === 0) return;
-
-  if (game.turnTimer) {
-    clearInterval(game.turnTimer);
-  }
-
-  game.turnTimer = setInterval(() => {
-    game.timeRemaining--;
-    
-    if (game.timeRemaining <= 0) {
-      // Auto-draw card and advance turn
-      const currentPlayer = game.players[game.currentPlayerIndex];
-      drawUnoCards(game, currentPlayer, 1);
-      advanceUnoTurn(game);
-      
-      if (game.settings.timePerTurn > 0) {
-        startUnoTurnTimer(gameId);
-      }
-      
-      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
-    } else {
-      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
-    }
-  }, 1000);
-}
-
-function getUnoGameStateForClient(game) {
-  return {
-    ...game,
-    turnTimer: undefined, // Don't send timer to client
-  };
-}
-
-// Head-to-Head Helper Functions
-function getRandomHeadToHeadCard() {
-  if (HEAD_TO_HEAD_CARDS.length === 0) {
-    return {
-      id: 'fallback',
-      category: 'Bollywood Movies',
-      description: 'Name any Bollywood movie',
-      examples: ['3 Idiots', 'Dangal', 'PK', 'Sultan']
-    };
-  }
-  return HEAD_TO_HEAD_CARDS[Math.floor(Math.random() * HEAD_TO_HEAD_CARDS.length)];
+  return game;
 }
 
 function selectPlayersForHeadToHead(game) {
-  if (game.teams.length < 2) return { teamA: null, teamB: null };
+  if (game.teams.length < 2) return null;
   
-  // For now, select first player from each team
-  // Later can implement rotation logic
+  // Get random player from each team
   const teamA = game.teams[0];
   const teamB = game.teams[1];
   
-  const playerA = teamA.players[0];
-  const playerB = teamB.players[0];
+  if (teamA.players.length === 0 || teamB.players.length === 0) return null;
+  
+  const playerA = teamA.players[Math.floor(Math.random() * teamA.players.length)];
+  const playerB = teamB.players[Math.floor(Math.random() * teamB.players.length)];
   
   return { teamA: playerA, teamB: playerB };
 }
 
-function startHeadToHeadRound(gameId) {
+async function startHeadToHeadRound(gameId) {
   const game = games.get(gameId);
   if (!game) return;
   
-  // Select head-to-head card
-  const card = getRandomHeadToHeadCard();
+  // Select head-to-head card from database
+  const card = await getRandomHeadToHeadCard();
+  if (!card) {
+    return;
+  }
   
   // Select players for head-to-head
   const players = selectPlayersForHeadToHead(game);
+  if (!players) {
+    return;
+  }
   
-  // Initialize head-to-head state with ready phase
   game.headToHead = {
-    isActive: false, // Will become true after countdown
+    isActive: false,
     card: card,
     currentPlayers: players,
     timeRemaining: game.settings.headToHeadTime,
@@ -401,686 +221,644 @@ function startHeadToHeadRound(gameId) {
     winner: null,
     isReady: false,
     countdownActive: false,
-    countdownTime: 0
+    countdownTime: 0,
   };
   
-  // Broadcast initial state
   io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
 }
 
 function startHeadToHeadCountdown(gameId) {
   const game = games.get(gameId);
-  if (!game || !game.headToHead) return;
+  if (!game) return;
   
-  game.headToHead.isReady = true;
   game.headToHead.countdownActive = true;
   game.headToHead.countdownTime = 3;
+  game.headToHead.isReady = true; // Hide ready button during countdown
   
-  // Clear any existing countdown timer
-  if (game.countdownTimer) {
-    clearInterval(game.countdownTimer);
-  }
-  
-  // Broadcast countdown start
-  io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-  
-  // Start countdown timer
-  game.countdownTimer = setInterval(() => {
-    if (game.headToHead.countdownTime > 0) {
+  const countdown = setInterval(() => {
       game.headToHead.countdownTime--;
-      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
       
       if (game.headToHead.countdownTime <= 0) {
-        // Countdown finished, start the actual round
-        clearInterval(game.countdownTimer);
-        game.countdownTimer = null;
-        
+      clearInterval(countdown);
         game.headToHead.countdownActive = false;
         game.headToHead.isActive = true;
+        game.headToHead.isReady = true;
         
-        // Start the main timer
+      // Start the actual head-to-head timer
         startHeadToHeadTimer(gameId);
       }
-    }
+    
+    io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
   }, 1000);
+  
+  game.countdownTimer = countdown;
 }
 
 function startHeadToHeadTimer(gameId) {
   const game = games.get(gameId);
-  if (!game || !game.headToHead.isActive) return;
+  if (!game) return;
   
-  // Clear any existing timer
-  if (game.headToHeadTimer) {
-    clearInterval(game.headToHeadTimer);
-  }
-  
-  // Start countdown timer
-  game.headToHeadTimer = setInterval(() => {
-    if (game.headToHead.timeRemaining > 0) {
+  const timer = setInterval(() => {
       game.headToHead.timeRemaining--;
       
-      // Broadcast timer update
-      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-      
       if (game.headToHead.timeRemaining <= 0) {
+      clearInterval(timer);
         endHeadToHeadRound(gameId);
       }
-    }
+    
+  io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
   }, 1000);
+  
+  game.headToHeadTimer = timer;
 }
 
-function endHeadToHeadRound(gameId) {
+async function endHeadToHeadRound(gameId) {
   const game = games.get(gameId);
   if (!game) return;
   
-  // Clear the timer
+  game.headToHead.isActive = false;
+  
+  // Clear timers
   if (game.headToHeadTimer) {
     clearInterval(game.headToHeadTimer);
     game.headToHeadTimer = null;
   }
   
-  // Determine winner (last player to submit)
-  let winner = null;
-  if (game.headToHead.submissions.length > 0) {
-    const lastSubmission = game.headToHead.submissions[game.headToHead.submissions.length - 1];
-    winner = lastSubmission.playerId;
-    game.headToHead.winner = winner;
+  if (game.countdownTimer) {
+    clearInterval(game.countdownTimer);
+    game.countdownTimer = null;
   }
   
-  // Mark head-to-head as inactive
-  game.headToHead.isActive = false;
+  // Determine winner (player with most submissions)
+  const submissions = game.headToHead.submissions;
+  const playerACounts = submissions.filter(s => s.playerId === game.headToHead.currentPlayers.teamA?.id).length;
+  const playerBCounts = submissions.filter(s => s.playerId === game.headToHead.currentPlayers.teamB?.id).length;
+  
+  let winner;
+  if (playerACounts > playerBCounts) {
+    winner = game.headToHead.currentPlayers.teamA?.id;
+  } else if (playerBCounts > playerACounts) {
+    winner = game.headToHead.currentPlayers.teamB?.id;
+  } else {
+    // Tie - random winner
+    winner = Math.random() < 0.5 ? game.headToHead.currentPlayers.teamA?.id : game.headToHead.currentPlayers.teamB?.id;
+  }
+  
+  game.headToHead.winner = winner;
   
   // Move to movie selection phase
   game.currentPhase = 'movie-selection';
   
-  // Generate 6 random movie cards for selection
-  game.movieCards = generateRandomMovieCards(6, game.settings.movieCategories);
-  
-  // Initialize player assignments
-  if (!game.currentPlayerAssignments) {
-    game.currentPlayerAssignments = {};
+  // Generate random movie cards from database
+  try {
+    const movieCards = await getRandomMovieCards(6, { category: 'bollywood' });
+    game.movieCards = movieCards;
+  } catch (error) {
+    game.movieCards = [];
   }
   
-  // Broadcast final state
   io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-}
-
-function createGame(gameId, hostPlayer) {
-  const game = {
-    id: gameId,
-    players: [hostPlayer],
-    settings: { ...DEFAULT_SETTINGS },
-    currentRound: 0,
-    currentActorId: null,
-    currentGuesser: null,
-    currentMovie: null,
-    timeRemaining: 0,
-    isActive: false,
-    isGameStarted: false,
-    isRoundActive: false,
-    winner: null,
-    roundTimer: null,
-  };
-  
-  games.set(gameId, game);
-  return game;
-}
-
-function getRandomMovie(categories) {
-  const filteredMovies = MOVIES.filter(movie => categories.includes(movie.category));
-  if (filteredMovies.length === 0) return MOVIES[0]; // Fallback
-  return filteredMovies[Math.floor(Math.random() * filteredMovies.length)];
-}
-
-// Generate movie cards for blockbuster game
-function generateRandomMovieCards(count = 6, categories = ['bollywood']) {
-  const filteredMovies = MOVIES.filter(movie => categories.includes(movie.category));
-  
-  if (filteredMovies.length === 0) {
-    // Fallback to all movies if no movies match the category
-    const fallbackMovies = MOVIES.slice(0, count);
-    return fallbackMovies.map((movie, i) => ({
-      id: `movie-${Date.now()}-${i}`,
-      title: movie.title,
-      genre: movie.genre || 'Unknown',
-      category: movie.category,
-      difficulty: movie.difficulty,
-    }));
-  }
-  
-  const selectedMovies = [];
-  const moviePool = [...filteredMovies]; // Copy to avoid modifying original
-  
-  for (let i = 0; i < count && moviePool.length > 0; i++) {
-    const randomIndex = Math.floor(Math.random() * moviePool.length);
-    const movie = moviePool.splice(randomIndex, 1)[0];
-    
-    // Convert to MovieCard format
-    selectedMovies.push({
-      id: `movie-${Date.now()}-${i}`,
-      title: movie.title,
-      genre: movie.genre,
-      category: movie.category,
-      difficulty: movie.difficulty,
-    });
-  }
-  
-  return selectedMovies;
 }
 
 function getGameStateForClient(game) {
-  // Return clean game state without timer references to prevent circular reference
-  const cleanGame = {
-    id: game.id,
-    players: game.players,
-    settings: game.settings,
-    currentRound: game.currentRound,
-    currentActorId: game.currentActorId,
-    currentGuesser: game.currentGuesser,
-    currentMovie: game.currentMovie,
-    timeRemaining: game.timeRemaining,
-    isActive: game.isActive,
-    isGameStarted: game.isGameStarted,
-    isRoundActive: game.isRoundActive,
-    winner: game.winner,
+  // Remove sensitive server data from game state
+  const clientGame = { ...game };
+  
+  // Remove server-only timers
+  delete clientGame.headToHeadTimer;
+  delete clientGame.countdownTimer;
+  delete clientGame.roundTimer;
+  
+  return clientGame;
+}
+
+// UNO Game Management Functions
+function createUnoGame(gameId, hostPlayer) {
+  const deck = generateUnoDeck(true);
+  
+  // Create players with initial hands
+  const players = [
+    {
+      ...hostPlayer,
+      hand: [],
+      score: 0,
+      hasCalledUno: false,
+      shieldActive: false,
+      lastActionCard: null,
+    }
+  ];
+
+  const game = {
+    id: gameId,
+    players,
+    settings: { ...DEFAULT_UNO_SETTINGS },
+    currentPhase: 'lobby',
+    currentPlayerIndex: 0,
+    direction: 1,
+    drawPile: deck.slice(14), // Reserve 14 cards for initial deal
+    discardPile: [deck[13]], // First card starts discard pile
+    currentColor: deck[13].color,
+    skipNext: false,
+    drawCount: 0,
+    isActive: false,
+    isGameStarted: false,
+    winner: null,
+    roundWinner: null,
+    timeRemaining: 0,
+    specialEffectActive: {
+      type: null,
+      playerId: null,
+      timeRemaining: 0,
+    },
+    gameHistory: [],
+    turnTimer: null,
+    specialEffectTimer: null,
   };
 
-  // Add blockbuster-specific fields if they exist
-  if (game.teams) {
-    cleanGame.teams = game.teams;
-    cleanGame.currentPhase = game.currentPhase;
-    cleanGame.movieCards = game.movieCards || [];
-    cleanGame.currentPlayerAssignments = game.currentPlayerAssignments || {};
-    cleanGame.currentRoundPlayer = game.currentRoundPlayer;
-    cleanGame.currentField = game.currentField;
-    cleanGame.roundHistory = game.roundHistory || [];
-    
-    // Clean roundState without timer references to prevent circular reference
-    if (game.roundState) {
-      cleanGame.roundState = {
-        currentPlayerIndex: game.roundState.currentPlayerIndex,
-        playersOrder: game.roundState.playersOrder,
-        revealedMovies: game.roundState.revealedMovies,
-        guessedMovies: game.roundState.guessedMovies,
-        isFirstMovieRevealed: game.roundState.isFirstMovieRevealed,
-        currentPlayerScore: game.roundState.currentPlayerScore
-        // Exclude movieRoundTimer to prevent circular reference
-      };
-    }
-    
-    // Clean head-to-head state without timer references
-    if (game.headToHead) {
-      cleanGame.headToHead = {
-        isActive: game.headToHead.isActive,
-        card: game.headToHead.card,
-        currentPlayers: game.headToHead.currentPlayers,
-        timeRemaining: game.headToHead.timeRemaining,
-        submissions: game.headToHead.submissions,
-        winner: game.headToHead.winner,
-        isReady: game.headToHead.isReady || false,
-        countdownActive: game.headToHead.countdownActive || false,
-        countdownTime: game.headToHead.countdownTime || 0
-      };
-    }
-  }
-
-  return cleanGame;
+  return game;
 }
 
-function startNewRound(gameId) {
-  const game = games.get(gameId);
-  if (!game || game.currentRound >= game.settings.rounds) return;
+function dealUnoCards(game) {
+  // Deal 7 cards to each player
+  game.players.forEach(player => {
+    player.hand = [];
+    for (let i = 0; i < 7; i++) {
+      if (game.drawPile.length > 0) {
+        player.hand.push(game.drawPile.pop());
+      }
+    }
+  });
 
-  game.currentRound++;
+  // Ensure first card is not a special card
+  while (game.discardPile[0].type === 'wild' || game.discardPile[0].type === 'wild-draw-four' || game.discardPile[0].type === 'unique') {
+    game.drawPile.push(game.discardPile[0]);
+    game.drawPile = shuffleDeck(game.drawPile);
+    game.discardPile[0] = game.drawPile.pop();
+  }
+
+  game.currentColor = game.discardPile[0].color;
+}
+
+function canPlayUnoCard(card, topCard, currentColor, game = null) {
+  // Special stacking rules: if there are accumulated draw cards, only allow stacking
+  if (game && game.drawCount > 0) {
+    const isTopCardDrawCard = topCard && (topCard.type === 'draw-two' || topCard.type === 'wild-draw-four');
+    if (isTopCardDrawCard) {
+      // Only allow draw cards to be played for stacking
+      return card.type === 'draw-two' || card.type === 'wild-draw-four';
+    }
+  }
+
+  // Wild cards can always be played (unless we're in stacking mode)
+  if (card.type === 'wild' || card.type === 'wild-draw-four') {
+    return true;
+  }
+
+  // Unique cards can generally be played (with some exceptions)
+  if (card.type === 'unique') {
+    return canPlayUniqueCard(card, topCard, currentColor);
+  }
+
+  // Standard cards: match color, number, or symbol
+  if (card.color === currentColor || card.color === topCard.color) {
+    return true;
+  }
+
+  if (card.type === 'number' && topCard.type === 'number' && card.value === topCard.value) {
+    return true;
+  }
+
+  if (card.type === topCard.type && card.type !== 'number') {
+    return true;
+  }
+
+  return false;
+}
+
+function canPlayUniqueCard(card, topCard, currentColor) {
+  switch (card.uniqueType) {
+    case 'revenge':
+      // Can only be played after opponent used an action card
+      return true; // Validation will be done in game state
+    
+    case 'final-stand':
+      // Can only be played when player has 3 or fewer cards
+      return true; // Validation will be done in game state
+    
+    default:
+      // Most unique cards can be played anytime
+      return true;
+  }
+}
+
+function drawUnoCards(game, player, count) {
+  const drawnCards = [];
   
-  // Switch roles (actor becomes guesser and vice versa)
-  if (game.currentActorId) {
-    const currentActorIndex = game.players.findIndex(p => p.id === game.currentActorId);
-    const nextActorIndex = (currentActorIndex + 1) % game.players.length;
-    game.currentActorId = game.players[nextActorIndex].id;
-  } else {
-    // First round - randomly select actor
-    if (game.players.length > 0) {
-      const randomIndex = Math.floor(Math.random() * game.players.length);
-      game.currentActorId = game.players[randomIndex].id;
+  for (let i = 0; i < count; i++) {
+    if (game.drawPile.length === 0) {
+      reshuffleDiscardPile(game);
+    }
+    
+    if (game.drawPile.length > 0) {
+      const card = game.drawPile.pop();
+      player.hand.push(card);
+      drawnCards.push(card);
     }
   }
   
-  game.currentGuesser = game.players.find(p => p.id !== game.currentActorId)?.id || null;
+  return drawnCards;
+}
+
+function reshuffleDiscardPile(game) {
+  if (game.discardPile.length <= 1) return;
   
-  // Get random movie
-  const movie = getRandomMovie(game.settings.movieCategories);
-  game.currentMovie = movie.title;
+  const topCard = game.discardPile[0];
+  const cardsToShuffle = game.discardPile.slice(1);
   
-  // Set timer
-  game.timeRemaining = game.settings.timeLimit;
-  game.isRoundActive = true;
-  
-  // Clear any existing timer first
-  if (game.roundTimer) {
-    clearInterval(game.roundTimer);
-    game.roundTimer = null;
+  game.drawPile = [...shuffleDeck(cardsToShuffle), ...game.drawPile];
+  game.discardPile = [topCard];
+}
+
+function advanceUnoTurn(game) {
+  // Handle skip effect
+  if (game.skipNext) {
+    game.skipNext = false;
+    // In 2-player game, skip means the same player goes again
+    return;
   }
+
+  // Advance to next player first
+  game.currentPlayerIndex = (game.currentPlayerIndex + game.direction + game.players.length) % game.players.length;
   
-  // Start countdown timer
-  if (game.settings.timeLimit > 0) {
-    game.roundTimer = setInterval(() => {
-      if (game.timeRemaining > 0) {
-        game.timeRemaining--;
-        io.to(gameId).emit('game-state', getGameStateForClient(game));
-        
-        if (game.timeRemaining <= 0) {
-          endRound(gameId, false);
+  // Handle draw effects - check if new current player can stack
+  if (game.drawCount > 0) {
+    const currentPlayer = game.players[game.currentPlayerIndex];
+    const topCard = game.discardPile[0];
+    
+    // Check if current player can stack draw cards
+    const canStack = topCard && (topCard.type === 'draw-two' || topCard.type === 'wild-draw-four') &&
+                     currentPlayer.hand.some(card => card.type === 'draw-two' || card.type === 'wild-draw-four');
+    
+    if (!canStack) {
+      // Check if player has shield active
+      if (currentPlayer.shieldActive) {
+        currentPlayer.shieldActive = false;
+      } else {
+        // Player must draw all accumulated cards
+        drawUnoCards(game, currentPlayer, game.drawCount);
+      }
+      
+      // Reset draw count and skip this player's turn
+      game.drawCount = 0;
+      
+      // Skip the current player's turn by advancing again
+      game.currentPlayerIndex = (game.currentPlayerIndex + game.direction + game.players.length) % game.players.length;
+    }
+  }
+}
+
+function applyUnoCardEffect(game, playedCard, playerId, additionalData = {}) {
+  const playerIndex = game.players.findIndex(p => p.id === playerId);
+  const currentPlayer = game.players[playerIndex];
+  const opponentIndex = playerIndex === 0 ? 1 : 0;
+  const opponent = game.players[opponentIndex];
+
+  // Remove card from player's hand
+  currentPlayer.hand = currentPlayer.hand.filter(c => c.id !== playedCard.id);
+
+  // Add to discard pile
+  game.discardPile.unshift(playedCard);
+
+  // Apply card effects
+  switch (playedCard.type) {
+    case 'number':
+      game.currentColor = playedCard.color;
+      advanceUnoTurn(game);
+      break;
+
+    case 'skip':
+      game.currentColor = playedCard.color;
+      game.skipNext = true;
+      currentPlayer.lastActionCard = playedCard;
+      advanceUnoTurn(game);
+      break;
+
+    case 'reverse':
+      game.currentColor = playedCard.color;
+      // In 2-player, reverse acts as skip
+      game.skipNext = true;
+      currentPlayer.lastActionCard = playedCard;
+      advanceUnoTurn(game);
+      break;
+
+    case 'draw-two':
+      game.currentColor = playedCard.color;
+      game.drawCount += 2;
+      currentPlayer.lastActionCard = playedCard;
+      advanceUnoTurn(game);
+      break;
+
+    case 'wild':
+      game.currentColor = additionalData.chosenColor || 'red';
+      advanceUnoTurn(game);
+      break;
+
+    case 'wild-draw-four':
+      game.currentColor = additionalData.chosenColor || 'red';
+      game.drawCount += 4;
+      currentPlayer.lastActionCard = playedCard;
+      advanceUnoTurn(game);
+      break;
+
+    case 'unique':
+      applyUniqueCardEffect(game, playedCard, playerId, additionalData);
+      break;
+  }
+
+  // Check for round end
+  if (currentPlayer.hand.length === 0) {
+    endUnoRound(game, playerId);
+  }
+}
+
+function applyUniqueCardEffect(game, card, playerId, additionalData) {
+  const currentPlayerIndex = game.players.findIndex(p => p.id === playerId);
+  const opponentIndex = currentPlayerIndex === 0 ? 1 : 0;
+  const currentPlayer = game.players[currentPlayerIndex];
+  const opponent = game.players[opponentIndex];
+
+  switch (card.uniqueType) {
+    case 'duel':
+      handleDuelCard(game, currentPlayer, opponent);
+      break;
+
+    case 'mirror':
+      const cardsToDraw = currentPlayer.hand.length;
+      drawUnoCards(game, opponent, cardsToDraw);
+      advanceUnoTurn(game);
+      break;
+
+    case 'swap-hands':
+      const tempHand = [...currentPlayer.hand];
+      currentPlayer.hand = [...opponent.hand];
+      opponent.hand = tempHand;
+      advanceUnoTurn(game);
+      break;
+
+    case 'peek-pick':
+      game.specialEffectActive = {
+        type: 'peek-pick',
+        playerId: playerId,
+        timeRemaining: 30,
+      };
+      startSpecialEffectTimer(game.id);
+      break;
+
+    case 'double-down':
+      if (additionalData.additionalCardId) {
+        const additionalCard = currentPlayer.hand.find(c => c.id === additionalData.additionalCardId);
+        if (additionalCard && additionalCard.type === 'number' && card.type === 'number') {
+          currentPlayer.hand = currentPlayer.hand.filter(c => c.id !== additionalCard.id);
+          game.discardPile.unshift(additionalCard);
+          drawUnoCards(game, opponent, 4);
         }
       }
-    }, 1000);
-  }
-  
-  // Emit game state first (exclude timer to prevent circular reference)
-  io.to(gameId).emit('game-state', getGameStateForClient(game));
-  
-  // Then emit round started event
-  io.to(gameId).emit('round-started', {
-    round: game.currentRound,
-    actorId: game.currentActorId,
-    movie: movie.title,
-  });
-}
+      advanceUnoTurn(game);
+      break;
 
-function endRound(gameId, wasGuessed = false) {
-  const game = games.get(gameId);
-  if (!game) return;
+    case 'revenge':
+      if (opponent.lastActionCard) {
+        applyUnoCardEffect(game, opponent.lastActionCard, opponent.id);
+      }
+      advanceUnoTurn(game);
+      break;
 
-  game.isRoundActive = false;
-  
-  // Clear the timer
-  if (game.roundTimer) {
-    clearInterval(game.roundTimer);
-    game.roundTimer = null;
-  }
-  
-  // Award points if guessed correctly
-  if (wasGuessed) {
-    const actor = game.players.find(p => p.id === game.currentActorId);
-    const guesser = game.players.find(p => p.id === game.currentGuesser);
-    
-    if (actor) actor.score++;
-    if (guesser) guesser.score++;
-  }
-  
-  // Emit game state update (exclude timer to prevent circular reference)
-  io.to(gameId).emit('game-state', getGameStateForClient(game));
-  
-  io.to(gameId).emit('round-ended', {
-    wasGuessed,
-    scores: game.players.map(p => ({ id: p.id, name: p.name, score: p.score })),
-  });
-  
-  // Check if game is over
-  if (game.currentRound >= game.settings.rounds) {
-    endGame(gameId);
-  } else {
-    // Start next round after delay
-    setTimeout(() => {
-      startNewRound(gameId);
-    }, 3000);
+    case 'shield':
+      currentPlayer.shieldActive = true;
+      advanceUnoTurn(game);
+      break;
+
+    case 'time-bomb':
+      game.specialEffectActive = {
+        type: 'time-bomb',
+        playerId: opponent.id,
+        timeRemaining: 10,
+      };
+      startSpecialEffectTimer(game.id);
+      break;
+
+    case 'lucky-draw':
+      const luckyCards = drawUnoCards(game, currentPlayer, 3);
+      // Player can play immediately if they have a valid card
+      advanceUnoTurn(game);
+      break;
+
+    case 'final-stand':
+      if (currentPlayer.hand.length <= 3) {
+        drawUnoCards(game, opponent, 5);
+        currentPlayer.shieldActive = true;
+      }
+      advanceUnoTurn(game);
+      break;
+
+    default:
+      advanceUnoTurn(game);
   }
 }
 
-function endGame(gameId) {
-  const game = games.get(gameId);
-  if (!game) return;
+function handleDuelCard(game, player1, player2) {
+  const card1 = player1.hand.find(c => c.type === 'number');
+  const card2 = player2.hand.find(c => c.type === 'number');
 
-  // Clear any active timers
-  if (game.roundTimer) {
-    clearInterval(game.roundTimer);
-    game.roundTimer = null;
-  }
-  
-  if (game.roundState?.movieRoundTimer) {
-    clearInterval(game.roundState.movieRoundTimer);
-    game.roundState.movieRoundTimer = null;
+  if (!card1 && !card2) {
+    // Both draw 2 cards
+    drawUnoCards(game, player1, 2);
+    drawUnoCards(game, player2, 2);
+  } else if (!card1) {
+    // Player 1 draws 3 cards
+    drawUnoCards(game, player1, 3);
+  } else if (!card2) {
+    // Player 2 draws 3 cards
+    drawUnoCards(game, player2, 3);
+      } else {
+    // Compare card values
+    if (card1.value > card2.value) {
+      drawUnoCards(game, player2, 3);
+    } else if (card2.value > card1.value) {
+      drawUnoCards(game, player1, 3);
+    } else {
+      // Tie - both draw 2
+      drawUnoCards(game, player1, 2);
+      drawUnoCards(game, player2, 2);
+    }
   }
 
-  game.isActive = false;
-  
-  // Determine winner
-  const sortedPlayers = [...game.players].sort((a, b) => b.score - a.score);
-  game.winner = sortedPlayers[0].id;
-  
-  io.to(gameId).emit('game-ended', {
-    winner: game.winner,
-    finalScores: sortedPlayers.map(p => ({ id: p.id, name: p.name, score: p.score })),
-  });
-  
-  io.to(gameId).emit('game-state', getGameStateForClient(game));
+  advanceUnoTurn(game);
 }
 
-// Movie round timer function
-function startMovieRoundTimer(gameId) {
+function endUnoRound(game, winnerId) {
+  const winner = game.players.find(p => p.id === winnerId);
+  const loser = game.players.find(p => p.id !== winnerId);
+
+  // Calculate points
+  const points = calculateUnoPoints(loser.hand);
+  winner.score += points;
+
+  // Record round history
+  game.gameHistory.push({
+    roundNumber: game.gameHistory.length + 1,
+    winner: winnerId,
+    playerScores: game.players.map(p => ({
+      playerId: p.id,
+      score: p.score,
+      cardsRemaining: p.hand.length,
+    })),
+    cardsPlayed: [], // Could track this if needed
+  });
+
+  game.currentPhase = 'round-ended';
+  game.roundWinner = winner;
+
+  // Check for game end (first to 500 points)
+  if (winner.score >= 500) {
+    game.currentPhase = 'game-over';
+    game.winner = winner;
+  }
+}
+
+function calculateUnoPoints(hand) {
+  return hand.reduce((total, card) => {
+    switch (card.type) {
+      case 'number':
+        return total + (card.value || 0);
+      case 'skip':
+      case 'reverse':
+      case 'draw-two':
+        return total + 20;
+      case 'wild':
+      case 'wild-draw-four':
+        return total + 50;
+      case 'unique':
+        return total + 30;
+      default:
+        return total;
+    }
+  }, 0);
+}
+
+function startUnoTurnTimer(gameId) {
   const game = games.get(gameId);
-  if (!game) return;
-  
-  // Clear any existing timer
-  if (game.roundState.movieRoundTimer) {
-    clearInterval(game.roundState.movieRoundTimer);
+  if (!game || !game.isActive || game.settings.timePerTurn === 0) return;
+
+  game.timeRemaining = game.settings.timePerTurn;
+
+  if (game.turnTimer) {
+    clearInterval(game.turnTimer);
   }
 
-  game.roundState.movieRoundTimer = setInterval(() => {
-    if (game.timeRemaining > 0) {
-      game.timeRemaining--;
+  game.turnTimer = setInterval(() => {
+    game.timeRemaining--;
+
+    if (game.timeRemaining <= 0) {
+      // Time's up - player draws a card and turn advances
+      const currentPlayer = game.players[game.currentPlayerIndex];
+      drawUnoCards(game, currentPlayer, 1);
+      advanceUnoTurn(game);
       
-      // Broadcast timer update
-      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-      
-      if (game.timeRemaining <= 0) {
-        endMovieRoundTurn(gameId);
+      if (game.isActive) {
+        startUnoTurnTimer(gameId);
       }
     }
+
+    // Emit game state update
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
   }, 1000);
 }
 
-// End current player's turn and switch to next player
-function endMovieRoundTurn(gameId) {
+function startSpecialEffectTimer(gameId) {
   const game = games.get(gameId);
-  if (!game) return;
-  
-  // Clear the timer
-  if (game.roundState.movieRoundTimer) {
-    clearInterval(game.roundState.movieRoundTimer);
-    game.roundState.movieRoundTimer = null;
-  }
-  
-  // Record current player's score
-  const currentPlayer = game.players.find(p => p.id === game.currentRoundPlayer);
-  if (currentPlayer) {
-    currentPlayer.score += game.roundState.currentPlayerScore;
+  if (!game || !game.specialEffectActive.type) return;
+
+  if (game.specialEffectTimer) {
+    clearInterval(game.specialEffectTimer);
   }
 
-  // Move to next player
-  game.roundState.currentPlayerIndex++;
-  
-  if (game.roundState.currentPlayerIndex >= game.roundState.playersOrder.length) {
-    // All players have played, end game
-    game.currentPhase = 'game-over';
-    game.isActive = false;
+  game.specialEffectTimer = setInterval(() => {
+    game.specialEffectActive.timeRemaining--;
 
-  } else {
-    // Switch to next player
-    game.currentRoundPlayer = game.roundState.playersOrder[game.roundState.currentPlayerIndex];
-    game.timeRemaining = game.settings.movieRoundTime;
-    game.isActive = false; // Timer starts when first movie is revealed
-    game.roundState.currentPlayerScore = 0;
-    game.roundState.isFirstMovieRevealed = false;
-    
-    const nextPlayer = game.players.find(p => p.id === game.currentRoundPlayer);
+    if (game.specialEffectActive.timeRemaining <= 0) {
+      // Handle timeout
+      if (game.specialEffectActive.type === 'time-bomb') {
+        const targetPlayer = game.players.find(p => p.id === game.specialEffectActive.playerId);
+        if (targetPlayer) {
+          drawUnoCards(game, targetPlayer, 3);
+        }
+      }
 
-  }
-  
-  // Broadcast updated state
-  io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+      // Clear special effect
+      game.specialEffectActive = {
+        type: null,
+        playerId: null,
+        timeRemaining: 0,
+      };
+
+      clearInterval(game.specialEffectTimer);
+      game.specialEffectTimer = null;
+    }
+
+    // Emit game state update
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+  }, 1000);
 }
 
+function getUnoGameStateForClient(game) {
+  return {
+    id: game.id,
+    players: game.players.map(player => ({
+      id: player.id,
+      name: player.name,
+      handCount: player.hand.length,
+      score: player.score,
+      isReady: player.isReady,
+      isHost: player.isHost,
+      hasCalledUno: player.hasCalledUno,
+      shieldActive: player.shieldActive,
+    })),
+    settings: game.settings,
+    currentPhase: game.currentPhase,
+    currentPlayerIndex: game.currentPlayerIndex,
+    currentColor: game.currentColor,
+    topCard: game.discardPile[0],
+    drawPileCount: game.drawPile.length,
+    drawCount: game.drawCount, // Add draw count for stacking logic
+    timeRemaining: game.timeRemaining,
+    specialEffectActive: game.specialEffectActive,
+    winner: game.winner,
+    roundWinner: game.roundWinner,
+    isActive: game.isActive,
+    isGameStarted: game.isGameStarted,
+  };
+}
+
+// Socket event handlers
 io.on('connection', (socket) => {
-
-  socket.on('join-game', ({ gameId, playerName, isHost }) => {
-    try {
-      let game = games.get(gameId);
-      
-      // Check if player is already in this game
-      if (game && game.players.find(p => p.id === socket.id)) {
-        socket.join(gameId);
-        socket.emit('game-state', getGameStateForClient(game));
-        return;
-      }
-      
-      if (!game) {
-        if (!isHost) {
-          socket.emit('error', 'Game not found');
-          return;
-        }
-        
-        // Create new game
-        const hostPlayer = {
-          id: socket.id,
-          name: playerName,
-          isHost: true,
-          isReady: false,
-          score: 0,
-        };
-        
-        game = createGame(gameId, hostPlayer);
-        playerSockets.set(socket.id, { gameId, playerId: socket.id });
-      } else {
-        // Join existing game
-        if (game.players.length >= 2) {
-          socket.emit('error', 'Game is full');
-          return;
-        }
-        
-        const player = {
-          id: socket.id,
-          name: playerName,
-          isHost: false,
-          isReady: false,
-          score: 0,
-        };
-        
-        game.players.push(player);
-        playerSockets.set(socket.id, { gameId, playerId: socket.id });
-      }
-      
-      socket.join(gameId);
-      socket.emit('game-state', getGameStateForClient(game));
-      socket.to(gameId).emit('player-joined', game.players.find(p => p.id === socket.id));
-      
-    } catch (error) {
-      socket.emit('error', 'Failed to join game');
-    }
-  });
-
-  socket.on('update-settings', ({ gameId, settings }) => {
-    const game = games.get(gameId);
-    if (!game) return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || !player.isHost) return;
-    
-    game.settings = { ...game.settings, ...settings };
-    io.to(gameId).emit('game-state', getGameStateForClient(game));
-  });
-
-  socket.on('player-ready', ({ gameId, playerId }) => {
-    const game = games.get(gameId);
-    if (!game) return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player) return;
-    
-    // Toggle ready status
-    player.isReady = !player.isReady;
-
-    // =============================
-    // Support Blockbuster teams
-    // If the game includes teams (Blockbuster variant), propagate the ready
-    // state to the corresponding player objects inside each team.
-    // =============================
-    if (Array.isArray(game.teams)) {
-      game.teams.forEach(team => {
-        const teamPlayer = team.players.find(p => p.id === player.id);
-        if (teamPlayer) {
-          teamPlayer.isReady = player.isReady;
-        }
-      });
-    }
-
-    // Emit the correct state event depending on the game type
-    if (Array.isArray(game.teams)) {
-      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-    } else {
-      io.to(gameId).emit('game-state', getGameStateForClient(game));
-    }
-  });
-
-  socket.on('start-game', ({ gameId }) => {
-    const game = games.get(gameId);
-    if (!game) return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || !player.isHost) return;
-    
-    if (game.players.length !== 2 || !game.players.every(p => p.isReady)) {
-      socket.emit('error', 'All players must be ready');
-      return;
-    }
-    
-    // Initialize game state
-    game.isGameStarted = true;
-    game.isActive = true;
-    game.currentRound = 0;
-    game.currentActorId = null;
-    game.currentGuesser = null;
-    game.currentMovie = null;
-    game.timeRemaining = 0;
-    game.isRoundActive = false;
-    
-    // Reset player scores
-    game.players.forEach(player => {
-      player.score = 0;
-    });
-    
-    io.to(gameId).emit('game-started');
-    io.to(gameId).emit('game-state', getGameStateForClient(game));
-    
-    // Start first round
-    setTimeout(() => {
-      startNewRound(gameId);
-    }, 1000);
-  });
-
-  // Movie revealed handler for movie round
-  socket.on('movie-revealed', ({ gameId, movieId, category }) => {
-    const game = games.get(gameId);
-    if (!game || game.currentPhase !== 'movie-round') {
-      socket.emit('error', 'Movie round is not active');
-      return;
-    }
-
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || player.id !== game.currentRoundPlayer) {
-      socket.emit('error', 'Not your turn');
-      return;
-    }
-
-    // Check if movie was already revealed
-    if (game.roundState.revealedMovies.some(m => m.movieId === movieId)) {
-      socket.emit('error', 'Movie already revealed');
-      return;
-    }
-
-    // Add to revealed movies
-    game.roundState.revealedMovies.push({
-      movieId,
-      playerId: player.id,
-      category,
-      timestamp: Date.now(),
-    });
-
-    // Start timer if this is the first movie revealed
-    if (!game.roundState.isFirstMovieRevealed) {
-      game.roundState.isFirstMovieRevealed = true;
-      game.isActive = true;
-      startMovieRoundTimer(gameId);
-    }
-
-    io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-  });
-
-  // Movie guessed handler for movie round
-  socket.on('movie-guessed', ({ gameId, movieId }) => {
-    const game = games.get(gameId);
-    if (!game || game.currentPhase !== 'movie-round') {
-      socket.emit('error', 'Movie round is not active');
-      return;
-    }
-
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || player.id !== game.currentRoundPlayer) {
-      socket.emit('error', 'Not your turn');
-      return;
-    }
-
-    // Check if movie was revealed
-    const revealedMovie = game.roundState.revealedMovies.find(m => m.movieId === movieId);
-    if (!revealedMovie) {
-      socket.emit('error', 'Movie not revealed yet');
-      return;
-    }
-
-    // Check if already guessed
-    if (game.roundState.guessedMovies.some(m => m.movieId === movieId)) {
-      socket.emit('error', 'Movie already guessed');
-      return;
-    }
-
-    // Add to guessed movies
-    game.roundState.guessedMovies.push({
-      movieId,
-      playerId: player.id,
-      category: revealedMovie.category,
-      timestamp: Date.now(),
-    });
-
-    game.roundState.currentPlayerScore++;
-
-    io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-  });
-
-  // Skip movie handler for movie round  
-  socket.on('skip-movie', ({ gameId, movieId }) => {
-    const game = games.get(gameId);
-    if (!game || game.currentPhase !== 'movie-round') {
-      socket.emit('error', 'Movie round is not active');
-      return;
-    }
-
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || player.id !== game.currentRoundPlayer) {
-      socket.emit('error', 'Not your turn');
-      return;
-    }
-
-    io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-  });
-
-  // Round complete handler
-  socket.on('round-complete', ({ gameId }) => {
-    const game = games.get(gameId);
-    if (!game || game.currentPhase !== 'movie-round') {
-      socket.emit('error', 'Movie round is not active');
-      return;
-    }
-
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || player.id !== game.currentRoundPlayer) {
-      socket.emit('error', 'Not your turn');
-      return;
-    }
-
-    endMovieRoundTurn(gameId);
-  });
-
-  // Removed play-again handler - players now redirect to lobby page instead
 
   // Blockbuster Game Handlers
   socket.on('create-blockbuster-game', ({ gameId, playerName, settings }) => {
     try {
-  
-      
       // Check if game already exists
-      if (games.get(gameId)) {
-        socket.emit('error', 'Game ID already exists');
+      const existingGame = games.get(gameId);
+      if (existingGame) {
+        // If it's the same player trying to recreate, allow rejoining
+        const existingHost = existingGame.players.find(p => p.isHost);
+        if (existingHost && existingHost.id === socket.id) {
+        socket.join(gameId);
+          socket.emit('blockbuster-game-state', getGameStateForClient(existingGame));
         return;
+      } else {
+          socket.emit('error', `Game ID "${gameId}" already exists. Please choose a different game ID.`);
+        return;
+        }
       }
       
       const hostPlayer = {
@@ -1093,37 +871,8 @@ io.on('connection', (socket) => {
       };
       
       // Create Blockbuster game state
-      const blockbusterGame = {
-        id: gameId,
-        teams: [],
-        settings: settings,
-        currentPhase: 'lobby',
-        headToHead: {
-          isActive: false,
-          card: null,
-          currentPlayers: { teamA: null, teamB: null },
-          timeRemaining: 0,
-          submissions: [],
-          winner: null,
-        },
-        movieCards: [],
-        currentPlayerAssignments: {},
-        currentRoundPlayer: null,
-        currentField: null,
-        timeRemaining: 0,
-        isActive: false,
-        isGameStarted: false,
-        winner: null,
-        roundHistory: [],
-        // Add compatibility fields for existing functions
-        players: [hostPlayer],
-        currentRound: 0,
-        currentActorId: null,
-        currentGuesser: null,
-        currentMovie: null,
-        isRoundActive: false,
-        roundTimer: null,
-      };
+      const blockbusterGame = createGame(gameId, hostPlayer);
+      blockbusterGame.settings = { ...blockbusterGame.settings, ...settings };
       
       games.set(gameId, blockbusterGame);
       playerSockets.set(socket.id, { gameId, playerId: socket.id });
@@ -1138,8 +887,6 @@ io.on('connection', (socket) => {
 
   socket.on('join-blockbuster-game', ({ gameId, playerName }) => {
     try {
-  
-      
       const game = games.get(gameId);
       if (!game) {
         socket.emit('error', 'Game not found');
@@ -1169,7 +916,6 @@ io.on('connection', (socket) => {
       socket.join(gameId);
       socket.emit('blockbuster-game-state', getGameStateForClient(game));
       socket.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-      
 
           } catch (error) {
         socket.emit('error', 'Failed to join game');
@@ -1205,7 +951,7 @@ io.on('connection', (socket) => {
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
 
     } catch (error) {
-      console.error('Error creating team:', error);
+      // Handle error
     }
   });
 
@@ -1238,7 +984,35 @@ io.on('connection', (socket) => {
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
 
     } catch (error) {
-      console.error('Error joining team:', error);
+      // Handle error
+    }
+  });
+
+  socket.on('player-ready', ({ gameId, playerId }) => {
+    const game = games.get(gameId);
+    if (!game) return;
+    
+    const player = game.players.find(p => p.id === socket.id);
+    if (!player) return;
+    
+    // Toggle ready status
+    player.isReady = !player.isReady;
+
+    // Support Blockbuster teams
+    if (Array.isArray(game.teams)) {
+      game.teams.forEach(team => {
+        const teamPlayer = team.players.find(p => p.id === player.id);
+        if (teamPlayer) {
+          teamPlayer.isReady = player.isReady;
+        }
+      });
+    }
+
+    // Emit the correct state event depending on the game type
+    if (Array.isArray(game.teams)) {
+      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+    } else {
+      io.to(gameId).emit('game-state', getGameStateForClient(game));
     }
   });
 
@@ -1278,12 +1052,11 @@ io.on('connection', (socket) => {
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
   
     } catch (error) {
-      console.error('Error starting Blockbuster game:', error);
+      socket.emit('error', 'Failed to start game');
     }
   });
 
-  // Head-to-Head ready handler
-  socket.on('head-to-head-ready', ({ gameId, playerId }) => {
+  socket.on('head-to-head-submission', ({ gameId, playerId, movieTitle }) => {
     try {
       const game = games.get(gameId);
       if (!game || game.currentPhase !== 'head-to-head') {
@@ -1306,116 +1079,16 @@ io.on('connection', (socket) => {
         return;
       }
 
+      // Handle special ready signal
+      if (movieTitle === 'head-to-head-ready') {
       // Start the countdown
       startHeadToHeadCountdown(gameId);
-      
-
-    } catch (error) {
-      console.error('Error handling head-to-head ready:', error);
-      socket.emit('error', 'Failed to start countdown');
-    }
-  });
-
-  // Movie selection handler
-  socket.on('movie-selection', ({ gameId, playerId, selectedMovies }) => {
-    try {
-      const game = games.get(gameId);
-      if (!game || game.currentPhase !== 'movie-selection') {
-        socket.emit('error', 'Movie selection is not active');
         return;
       }
 
-      const player = game.players.find(p => p.id === socket.id);
-      if (!player || player.id !== playerId) {
-        socket.emit('error', 'Invalid player');
-        return;
-      }
-
-      // Validate movie selection
-      if (!selectedMovies || !selectedMovies.oneWord || !selectedMovies.dialogue || !selectedMovies.actOut) {
-        socket.emit('error', 'Please select movies for all categories');
-        return;
-      }
-
-      // Find the movie cards based on IDs
-      const oneWordMovie = game.movieCards.find(m => m.id === selectedMovies.oneWord);
-      const dialogueMovie = game.movieCards.find(m => m.id === selectedMovies.dialogue);
-      const actOutMovie = game.movieCards.find(m => m.id === selectedMovies.actOut);
-
-      if (!oneWordMovie || !dialogueMovie || !actOutMovie) {
-        socket.emit('error', 'Invalid movie selection');
-        return;
-      }
-
-      // Store player's movie assignments
-      game.currentPlayerAssignments[playerId] = {
-        oneWord: oneWordMovie,
-        dialogue: dialogueMovie,
-        actOut: actOutMovie,
-      };
-
-
-
-      // Check if both head-to-head players have made their selections
-      const headToHeadWinner = game.headToHead.winner;
-      const loserTeam = game.teams.find(team => 
-        !team.players.some(p => p.id === headToHeadWinner)
-      );
-      const loserPlayer = loserTeam?.players[0]; // For now, use first player of losing team
-
-      const winnerHasSelected = game.currentPlayerAssignments[headToHeadWinner];
-      const loserHasSelected = loserPlayer ? game.currentPlayerAssignments[loserPlayer.id] : false;
-
-      if (winnerHasSelected && loserHasSelected) {
-        // Both players have selected, move to movie round
-        game.currentPhase = 'movie-round';
-        game.currentRoundPlayer = headToHeadWinner; // Winner goes first
-        game.timeRemaining = game.settings.movieRoundTime;
-        game.isActive = false; // Timer starts when first movie is revealed
-        
-        // Initialize movie round state
-        game.roundState = {
-          currentPlayerIndex: 0, // 0 = first player (winner), 1 = second player (loser) 
-          playersOrder: [headToHeadWinner, loserPlayer?.id].filter(Boolean),
-          revealedMovies: [], // { movieId, playerId, category, timestamp }
-          guessedMovies: [], // { movieId, playerId, category, timestamp }
-          isFirstMovieRevealed: false,
-          currentPlayerScore: 0,
-          movieRoundTimer: null,
-        };
-
-
-      }
-
-      // Broadcast updated game state
-      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
-    } catch (error) {
-      console.error('Error handling movie selection:', error);
-      socket.emit('error', 'Failed to select movies');
-    }
-  });
-
-  // Head-to-Head submission handler (simplified button press)
-  socket.on('head-to-head-submission', ({ gameId, playerId, movieTitle }) => {
-    try {
-      const game = games.get(gameId);
-      if (!game || game.currentPhase !== 'head-to-head' || !game.headToHead.isActive) {
-        socket.emit('error', 'Head-to-head round is not active');
-        return;
-      }
-
-      const player = game.players.find(p => p.id === socket.id);
-      if (!player || player.id !== playerId) {
-        socket.emit('error', 'Invalid player');
-        return;
-      }
-
-      // Check if player is participating in this head-to-head
-      const isParticipating = game.headToHead.currentPlayers.teamA?.id === playerId || 
-                              game.headToHead.currentPlayers.teamB?.id === playerId;
-      
-      if (!isParticipating) {
-        socket.emit('error', 'You are not participating in this head-to-head');
+      // For regular turns, check if head-to-head is active
+      if (!game.headToHead.isActive) {
+        socket.emit('error', 'Head-to-head round is not active yet');
         return;
       }
 
@@ -1431,7 +1104,7 @@ io.on('connection', (socket) => {
       // Add turn record (no movie validation needed)
       const submission = {
         playerId,
-        movie: 'turn-completed', // Placeholder since we're not tracking actual movies
+        movie: movieTitle === 'turn-completed' ? 'turn-completed' : movieTitle,
         timestamp: Date.now()
       };
       
@@ -1446,222 +1119,228 @@ io.on('connection', (socket) => {
       
 
     } catch (error) {
-      console.error('Error handling head-to-head turn:', error);
-      socket.emit('error', 'Failed to complete turn');
+      socket.emit('error', 'Failed to complete submission');
     }
   });
 
-  // UNO Game Event Handlers
-  socket.on('join-uno-game', ({ gameId, playerName, isHost }) => {
+  // UNO Game Socket Events
+  socket.on('join-uno-game', ({ gameId, playerName }) => {
     try {
       let game = games.get(gameId);
       
-      // Check if player is already in this game
-      if (game && game.players.find(p => p.id === socket.id)) {
-        socket.join(gameId);
-        socket.emit('unoGameState', getUnoGameStateForClient(game));
-        return;
-      }
-      
       if (!game) {
-        if (!isHost) {
-          socket.emit('error', 'Game not found');
-          return;
-        }
-        
         // Create new UNO game
         const hostPlayer = {
           id: socket.id,
           name: playerName,
           isHost: true,
-          isReady: false,
+          isReady: true, // Auto-ready
         };
         
-        game = createUnoGame(gameId, hostPlayer, DEFAULT_UNO_SETTINGS);
+        game = createUnoGame(gameId, hostPlayer);
         games.set(gameId, game);
-        playerSockets.set(socket.id, { gameId, playerId: socket.id });
       } else {
-        // Join existing UNO game
+        // Join existing game
         if (game.players.length >= 2) {
           socket.emit('error', 'Game is full');
           return;
         }
         
-        const deck = generateUnoDeck(game.settings.includeUniqueCards);
-        const { playerHands } = dealUnoCards(deck, 2);
+        if (game.isGameStarted) {
+          socket.emit('error', 'Game already started');
+          return;
+        }
         
-        const player = {
-          id: socket.id,
-          name: playerName,
-          isHost: false,
-          isReady: false,
-          hand: playerHands[1],
-          score: 0,
-          hasCalledUno: false,
-          shieldActive: false,
-        };
-        
-        game.players.push(player);
-        // Update first player's hand
-        game.players[0].hand = playerHands[0];
-        
-        playerSockets.set(socket.id, { gameId, playerId: socket.id });
+        // Check if player already exists
+        const existingPlayer = game.players.find(p => p.id === socket.id);
+        if (!existingPlayer) {
+          const newPlayer = {
+            id: socket.id,
+            name: playerName,
+            isHost: false,
+            isReady: true, // Auto-ready
+            hand: [],
+            score: 0,
+            hasCalledUno: false,
+            shieldActive: false,
+            lastActionCard: null,
+          };
+          
+          game.players.push(newPlayer);
+        }
       }
       
+      // Join socket room
       socket.join(gameId);
-      socket.emit('unoGameState', getUnoGameStateForClient(game));
-      socket.to(gameId).emit('unoPlayerJoined', game.players.find(p => p.id === socket.id));
+      playerSockets.set(socket.id, { gameId, playerName });
+      
+      // Auto-start game when 2 players join
+      if (game.players.length === 2 && !game.isGameStarted) {
+        // Initialize game
+        dealUnoCards(game);
+        game.currentPhase = 'playing';
+        game.isGameStarted = true;
+        game.isActive = true;
+        game.currentPlayerIndex = 0;
+        
+        // Start turn timer if enabled
+        if (game.settings.timePerTurn > 0) {
+          startUnoTurnTimer(gameId);
+        }
+        
+
+      }
+      
+      // Emit game state with individual hands
+      game.players.forEach(player => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: player.hand,
+        };
+        io.to(player.id).emit('unoGameState', gameStateForPlayer);
+      });
       
     } catch (error) {
-      console.error('Error joining UNO game:', error);
       socket.emit('error', 'Failed to join game');
     }
   });
 
-  socket.on('update-uno-settings', ({ gameId, settings }) => {
-    const game = games.get(gameId);
-    if (!game || game.settings.gameType !== 'uno') return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || !player.isHost) return;
-    
-    game.settings = { ...game.settings, ...settings };
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
-  });
-
   socket.on('uno-player-ready', ({ gameId }) => {
-    const game = games.get(gameId);
-    if (!game || game.settings.gameType !== 'uno') return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player) return;
-    
-    player.isReady = !player.isReady;
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player) {
+        socket.emit('error', 'Player not found');
+        return;
+      }
+
+      // Toggle ready status
+      player.isReady = !player.isReady;
+      
+      // Emit updated game state
+      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to update ready status');
+    }
   });
 
   socket.on('start-uno-game', ({ gameId }) => {
-    const game = games.get(gameId);
-    if (!game || game.settings.gameType !== 'uno') return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || !player.isHost) return;
-    
-    if (game.players.length !== 2 || !game.players.every(p => p.isReady)) {
-      socket.emit('error', 'All players must be ready');
-      return;
-    }
-    
-    // Start the game
-    game.isGameStarted = true;
-    game.isActive = true;
-    game.currentPhase = 'playing';
-    game.currentPlayerIndex = 0;
-    
-    // Re-deal cards for fresh start
-    const deck = generateUnoDeck(game.settings.includeUniqueCards);
-    const { playerHands, remainingDeck, startCard } = dealUnoCards(deck, 2);
-    
-    game.players[0].hand = playerHands[0];
-    game.players[1].hand = playerHands[1];
-    game.drawPile = remainingDeck;
-    game.discardPile = [startCard];
-    game.currentColor = startCard.color;
-    
-    startUnoTurnTimer(gameId);
-    io.to(gameId).emit('unoGameStarted');
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
-  });
-
-  socket.on('play-uno-card', ({ gameId, cardId, chosenColor }) => {
     try {
       const game = games.get(gameId);
-      if (!game || !game.isActive || game.settings.gameType !== 'uno') {
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || !player.isHost) {
+        socket.emit('error', 'Only host can start the game');
+        return;
+      }
+      
+      if (game.players.length < 2) {
+        socket.emit('error', 'Need 2 players to start');
+        return;
+      }
+
+      if (!game.players.every(p => p.isReady)) {
+        socket.emit('error', 'All players must be ready');
+        return;
+      }
+      
+      // Initialize game
+      dealUnoCards(game);
+      game.currentPhase = 'playing';
+      game.isGameStarted = true;
+      game.isActive = true;
+      game.currentPlayerIndex = 0;
+      
+      // Start turn timer
+      startUnoTurnTimer(gameId);
+      
+      // Emit game state with individual hands
+      game.players.forEach(player => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: player.hand,
+        };
+        io.to(player.id).emit('unoGameState', gameStateForPlayer);
+      });
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to start game');
+    }
+  });
+
+  socket.on('play-uno-card', ({ gameId, cardId, chosenColor, additionalData }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || !game.isActive) {
         socket.emit('error', 'Game not active');
         return;
       }
       
-      const player = game.players.find(p => p.id === socket.id);
-      if (!player || game.players[game.currentPlayerIndex].id !== socket.id) {
-        socket.emit('error', 'Not your turn');
+      const playerIndex = game.players.findIndex(p => p.id === socket.id);
+      if (playerIndex === -1) {
         return;
       }
       
-      const cardIndex = player.hand.findIndex(c => c.id === cardId);
-      if (cardIndex === -1) {
-        socket.emit('error', 'Card not found');
+      if (playerIndex !== game.currentPlayerIndex) {
         return;
       }
       
-      const card = player.hand[cardIndex];
+      const player = game.players[playerIndex];
+      const card = player.hand.find(c => c.id === cardId);
+      if (!card) {
+        return;
+      }
+      
+      // Validate card can be played
       const topCard = game.discardPile[0];
-      
-      if (!canPlayUnoCard(card, topCard, game.currentColor)) {
-        socket.emit('error', 'Invalid card play');
+      if (!canPlayUnoCard(card, topCard, game.currentColor, game)) {
         return;
       }
       
-      // Remove card from player's hand
-      player.hand.splice(cardIndex, 1);
-      
-      // Add card to discard pile
-      game.discardPile.unshift(card);
-      
-      // Update current color
-      if (card.type === 'wild' || card.type === 'wild-draw-four') {
-        game.currentColor = chosenColor || 'red';
-      } else {
-        game.currentColor = card.color;
-      }
-      
-      // Handle card effects
-      switch (card.type) {
-        case 'skip':
-          game.skipNext = true;
-          break;
-        case 'reverse':
-          // In 2-player game, reverse acts like skip
-          game.skipNext = true;
-          break;
-        case 'draw-two':
-          const nextPlayer = game.players[(game.currentPlayerIndex + 1) % game.players.length];
-          drawUnoCards(game, nextPlayer, 2);
-          game.skipNext = true;
-          break;
-        case 'wild-draw-four':
-          const targetPlayer = game.players[(game.currentPlayerIndex + 1) % game.players.length];
-          drawUnoCards(game, targetPlayer, 4);
-          game.skipNext = true;
-          break;
-      }
-      
-      // Check for UNO (1 card left)
-      if (player.hand.length === 1 && !player.hasCalledUno) {
-        // Penalty for not calling UNO
-        drawUnoCards(game, player, 2);
-      }
-      
-      // Check for win condition
-      if (player.hand.length === 0) {
-        game.winner = player.id;
-        game.roundWinner = player;
-        game.isActive = false;
-        if (game.turnTimer) {
-          clearInterval(game.turnTimer);
+      // Special validations for unique cards
+      if (card.type === 'unique') {
+        if (card.uniqueType === 'final-stand' && player.hand.length > 3) {
+          return;
         }
-        io.to(gameId).emit('unoGameEnded', player);
-      } else {
-        // Continue game
-        advanceUnoTurn(game);
-        if (game.settings.timePerTurn > 0) {
-          startUnoTurnTimer(gameId);
+        
+        if (card.uniqueType === 'revenge' && !game.players.find(p => p.id !== socket.id)?.lastActionCard) {
+          return;
         }
       }
       
-      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      // Apply card effect
+      applyUnoCardEffect(game, card, socket.id, { chosenColor, ...additionalData });
+      
+      // Reset UNO call status if player has more than 1 card
+      if (player.hand.length > 1) {
+        player.hasCalledUno = false;
+      }
+      
+      // Start new turn timer if game is still active
+      if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
+        startUnoTurnTimer(gameId);
+      }
+      
+      // Emit updated game state with individual hands
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
       
     } catch (error) {
-      console.error('Error playing UNO card:', error);
       socket.emit('error', 'Failed to play card');
     }
   });
@@ -1669,53 +1348,263 @@ io.on('connection', (socket) => {
   socket.on('draw-uno-card', ({ gameId }) => {
     try {
       const game = games.get(gameId);
-      if (!game || !game.isActive || game.settings.gameType !== 'uno') {
+      if (!game || !game.isActive) {
         socket.emit('error', 'Game not active');
         return;
       }
       
-      const player = game.players.find(p => p.id === socket.id);
-      if (!player || game.players[game.currentPlayerIndex].id !== socket.id) {
-        socket.emit('error', 'Not your turn');
+      const playerIndex = game.players.findIndex(p => p.id === socket.id);
+      if (playerIndex === -1) {
         return;
       }
       
-      const drawnCards = drawUnoCards(game, player, 1);
-      
-      // Player can choose to play the drawn card if it's valid
-      const topCard = game.discardPile[0];
-      const canPlay = drawnCards.length > 0 && canPlayUnoCard(drawnCards[0], topCard, game.currentColor);
-      
-      if (!canPlay) {
-        // Must pass turn
-        advanceUnoTurn(game);
-        if (game.settings.timePerTurn > 0) {
-          startUnoTurnTimer(gameId);
-        }
+      if (playerIndex !== game.currentPlayerIndex) {
+        return;
       }
       
-      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      const player = game.players[playerIndex];
+      
+      // Draw cards (including any draw penalties)
+      const cardsToDraw = Math.max(1, game.drawCount);
+      drawUnoCards(game, player, cardsToDraw);
+      game.drawCount = 0;
+      
+      // Advance turn
+      advanceUnoTurn(game);
+      
+      // Start new turn timer
+      if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
+        startUnoTurnTimer(gameId);
+      }
+      
+      // Emit updated game state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
       
     } catch (error) {
-      console.error('Error drawing UNO card:', error);
       socket.emit('error', 'Failed to draw card');
     }
   });
 
   socket.on('call-uno', ({ gameId }) => {
-    const game = games.get(gameId);
-    if (!game || game.settings.gameType !== 'uno') return;
-    
-    const player = game.players.find(p => p.id === socket.id);
-    if (!player || player.hand.length !== 1) return;
-    
-    player.hasCalledUno = true;
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    try {
+      const game = games.get(gameId);
+      if (!game || !game.isActive) {
+        socket.emit('error', 'Game not active');
+        return;
+      }
+
+            const player = game.players.find(p => p.id === socket.id);
+      if (!player) {
+        return;
+      }
+      
+      if (player.hand.length !== 1) {
+        return;
+      }
+
+      player.hasCalledUno = true;
+      
+      // Broadcast UNO call
+      io.to(gameId).emit('uno-called', { 
+        playerId: socket.id, 
+        playerName: player.name 
+      });
+      
+      // Emit updated game state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to call UNO');
+    }
   });
 
-  socket.on('leave-game', ({ gameId }) => {
-    handlePlayerLeave(socket.id, gameId);
+  socket.on('peek-pick-card', ({ gameId, targetCardId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.specialEffectActive.type !== 'peek-pick') {
+        socket.emit('error', 'Peek-pick not active');
+        return;
+      }
+
+      if (game.specialEffectActive.playerId !== socket.id) {
+        socket.emit('error', 'Not your peek-pick turn');
+        return;
+      }
+      
+      const targetPlayer = game.players.find(p => p.id !== socket.id);
+      const cardToRemove = targetPlayer.hand.find(c => c.id === targetCardId);
+      
+      if (cardToRemove) {
+        // Remove card from opponent's hand
+        targetPlayer.hand = targetPlayer.hand.filter(c => c.id !== targetCardId);
+        
+        // Add to discard pile
+        game.discardPile.unshift(cardToRemove);
+        game.currentColor = cardToRemove.color || game.currentColor;
+      }
+      
+      // Clear special effect
+      game.specialEffectActive = {
+        type: null,
+        playerId: null,
+        timeRemaining: 0,
+      };
+      
+      if (game.specialEffectTimer) {
+        clearInterval(game.specialEffectTimer);
+        game.specialEffectTimer = null;
+      }
+      
+      // Advance turn
+      advanceUnoTurn(game);
+      
+      // Start turn timer
+      if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
+        startUnoTurnTimer(gameId);
+      }
+      
+      // Emit updated game state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
+
+    } catch (error) {
+      socket.emit('error', 'Failed to handle peek-pick');
+    }
   });
+
+  socket.on('next-uno-round', ({ gameId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.currentPhase !== 'round-ended') {
+        socket.emit('error', 'Cannot start next round');
+        return;
+      }
+      
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || !player.isHost) {
+        socket.emit('error', 'Only host can start next round');
+        return;
+      }
+      
+      // Reset for next round
+      const deck = generateUnoDeck(game.settings.includeUniqueCards);
+      game.drawPile = deck.slice(14);
+      game.discardPile = [deck[13]];
+      game.currentColor = deck[13].color;
+      game.currentPhase = 'playing';
+      game.currentPlayerIndex = 0;
+      game.skipNext = false;
+      game.drawCount = 0;
+      game.isActive = true;
+      game.roundWinner = null;
+      
+      // Reset player states
+      game.players.forEach(p => {
+        p.hasCalledUno = false;
+        p.shieldActive = false;
+        p.lastActionCard = null;
+      });
+      
+      // Deal new cards
+      dealUnoCards(game);
+      
+      // Start turn timer
+      if (game.settings.timePerTurn > 0) {
+        startUnoTurnTimer(gameId);
+      }
+      
+      // Emit game state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to start next round');
+    }
+  });
+
+  socket.on('block-uno', ({ gameId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || !game.isActive) {
+        socket.emit('error', 'Game not active');
+        return;
+      }
+
+      const blockingPlayer = game.players.find(p => p.id === socket.id);
+      if (!blockingPlayer) {
+        return;
+      }
+      
+      // Find the opponent who might have called UNO
+      const opponent = game.players.find(p => p.id !== socket.id);
+      if (!opponent) {
+        return;
+      }
+      
+      // Check if opponent has exactly 1 card and hasn't called UNO
+      if (opponent.hand.length === 1 && !opponent.hasCalledUno) {
+        // Block successful - opponent draws 2 cards as penalty
+        drawUnoCards(game, opponent, 2);
+        
+        // Broadcast block event
+        io.to(gameId).emit('uno-blocked', { 
+          blockingPlayerId: socket.id, 
+          blockingPlayerName: blockingPlayer.name,
+          blockedPlayerId: opponent.id,
+          blockedPlayerName: opponent.name
+        });
+        
+
+      } else {
+        // Block failed - blocking player draws 2 cards as penalty
+        drawUnoCards(game, blockingPlayer, 2);
+        
+        // Broadcast failed block event
+        io.to(gameId).emit('uno-block-failed', { 
+          blockingPlayerId: socket.id, 
+          blockingPlayerName: blockingPlayer.name
+        });
+        
+
+      }
+      
+      // Emit updated game state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to block UNO');
+    }
+  });
+
+
 
   socket.on('disconnect', () => {
     const playerInfo = playerSockets.get(socket.id);
@@ -1738,7 +1627,7 @@ function handlePlayerLeave(socketId, gameId) {
   playerSockets.delete(socketId);
   
   if (game.players.length === 0) {
-    // Delete empty game
+    // Delete empty game - clean up all timers
     if (game.roundTimer) {
       clearInterval(game.roundTimer);
     }
@@ -1748,6 +1637,13 @@ function handlePlayerLeave(socketId, gameId) {
     if (game.countdownTimer) {
       clearInterval(game.countdownTimer);
     }
+    // UNO timers
+    if (game.turnTimer) {
+      clearInterval(game.turnTimer);
+    }
+    if (game.specialEffectTimer) {
+      clearInterval(game.specialEffectTimer);
+    }
     games.delete(gameId);
   } else {
     // Update host if needed
@@ -1755,31 +1651,45 @@ function handlePlayerLeave(socketId, gameId) {
       game.players[0].isHost = true;
     }
     
-    // End game if in progress
-    if (game.isGameStarted && game.isActive) {
-      endGame(gameId);
-    }
-    
+    // Emit appropriate events based on game type
     io.to(gameId).emit('player-left', socketId);
+    
+    if (game.settings && game.settings.gameType === 'uno') {
+      // For UNO games, emit UNO-specific state
+      game.players.forEach(gamePlayer => {
+        const gameStateForPlayer = {
+          ...getUnoGameStateForClient(game),
+          playerHand: gamePlayer.hand || [],
+        };
+        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+      });
+    } else if (Array.isArray(game.teams)) {
+      // For Blockbuster games
+      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+    } else {
+      // For other games
     io.to(gameId).emit('game-state', getGameStateForClient(game));
   }
-  
-
+  }
 }
 
 const PORT = process.env.PORT || 3001;
 
-server.listen(PORT, () => {
-  console.log(`Socket.IO server running on port ${PORT}`);
-  console.log(`Server startup complete. Games map initialized.`);
-}).on('error', (err) => {
+// Initialize database and start server
+async function startServer() {
+  try {
+    // Initialize database first
+    await initializeDatabase();
+
+server.listen(PORT).on('error', (err) => {
   if (err.code === 'EADDRINUSE') {
-    console.log(`Port ${PORT} is busy, trying port ${PORT + 1}...`);
-    server.listen(PORT + 1, () => {
-      console.log(`Socket.IO server running on port ${PORT + 1}`);
-      console.log(`Server startup complete. Games map initialized.`);
-    });
-  } else {
-    console.error('Server error:', err);
+    server.listen(PORT + 1);
   }
 }); 
+  } catch (error) {
+    process.exit(1);
+  }
+}
+
+// Start the server
+startServer(); 

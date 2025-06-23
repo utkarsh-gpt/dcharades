@@ -7,8 +7,8 @@ import { useSocket } from '@/lib/shared/socket-context';
 import { BlockbusterGameState, Player, Team } from '@/lib/shared/types';
 import BlockbusterLobby from '@/components/blockbuster/BlockbusterLobby';
 import HeadToHeadChallenge from '@/components/blockbuster/HeadToHeadChallenge';
-import MovieSelection from '@/components/movies/MovieSelection';
-import MovieRoundGameplay from '@/components/movies/MovieRoundGameplay';
+import MovieSelection from '@/components/blockbuster/MovieSelection';
+import MovieRoundGameplay from '@/components/blockbuster/MovieRoundGameplay';
 
 export default function BlockbusterGameRoom() {
   const params = useParams();
@@ -124,18 +124,12 @@ export default function BlockbusterGameRoom() {
   // Handle head-to-head submission
   const handleHeadToHeadSubmission = useCallback((movieTitle: string) => {
     if (socket && currentPlayer) {
-      if (movieTitle === 'head-to-head-ready') {
-        socket.emit('head-to-head-ready', {
-          gameId,
-          playerId: currentPlayer.id,
-        });
-      } else {
-        socket.emit('head-to-head-submission', {
-          gameId,
-          playerId: currentPlayer.id,
-          movieTitle,
-        });
-      }
+      // Always use head-to-head-submission event for both ready signal and movie submissions
+      socket.emit('head-to-head-submission', {
+        gameId,
+        playerId: currentPlayer.id,
+        movieTitle,
+      });
     }
   }, [socket, gameId, currentPlayer]);
 

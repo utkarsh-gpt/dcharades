@@ -67,6 +67,40 @@ export interface UnoGameState {
   gameHistory: UnoGameRound[];
 }
 
+// Client-side game state (what the server sends to clients)
+export interface UnoGameStateClient {
+  id: string;
+  players: Array<{
+    id: string;
+    name: string;
+    handCount: number;
+    score: number;
+    isReady: boolean;
+    isHost: boolean;
+    hasCalledUno: boolean;
+    shieldActive: boolean;
+  }>;
+  settings: UnoGameSettings;
+  currentPhase: 'lobby' | 'playing' | 'round-ended' | 'game-over';
+  currentPlayerIndex: number;
+  currentColor: UnoColor | null;
+  topCard: UnoCard;
+  drawPileCount: number;
+  drawCount: number; // Accumulated draw cards for stacking
+  timeRemaining: number;
+  specialEffectActive: {
+    type: UniqueCardType | null;
+    playerId: string | null;
+    timeRemaining: number;
+  };
+  winner: UnoPlayer | null;
+  roundWinner: UnoPlayer | null;
+  isActive: boolean;
+  isGameStarted: boolean;
+  // Individual player's hand (only sent to that player)
+  playerHand?: UnoCard[];
+}
+
 export interface UnoGameRound {
   roundNumber: number;
   winner: string; // Player ID
@@ -134,7 +168,7 @@ export interface JoinUnoGameRequest {
 // Default settings
 export const DEFAULT_UNO_SETTINGS: UnoGameSettings = {
   gameType: 'uno',
-  timePerTurn: 30, // 30 seconds per turn
+  timePerTurn: 0, // No time limit
   includeUniqueCards: true,
   enableChat: true,
 };

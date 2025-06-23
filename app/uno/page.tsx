@@ -21,7 +21,7 @@ export default function UnoLobby() {
 
     setIsCreating(true);
     try {
-      const newGameId = uuidv4();
+      const newGameId = uuidv4().substring(0, 5).toUpperCase();
       
       // Store player info in localStorage for the game
       localStorage.setItem('unoPlayerName', playerName);
@@ -54,7 +54,7 @@ export default function UnoLobby() {
       localStorage.setItem('unoPlayerName', playerName);
       
       // Navigate to the game
-      router.push(`/uno-game/${gameId}`);
+      router.push(`/uno-game/${gameId.toUpperCase()}`);
     } catch (error) {
       console.error('Error joining game:', error);
       alert('Failed to join game. Please check the game ID and try again.');
@@ -193,9 +193,10 @@ export default function UnoLobby() {
                 type="text"
                 id="gameId"
                 value={gameId}
-                onChange={(e) => setGameId(e.target.value)}
+                onChange={(e) => setGameId(e.target.value.toUpperCase())}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-game-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Enter game ID"
+                maxLength={5}
               />
             </div>
             <button

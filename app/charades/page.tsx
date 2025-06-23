@@ -18,7 +18,7 @@ export default function CharadesPage() {
     }
 
     setIsCreating(true);
-    const newGameId = uuidv4().substring(0, 8).toUpperCase();
+    const newGameId = uuidv4().substring(0, 5).toUpperCase();
     
     // Store player info in localStorage
     localStorage.setItem('playerName', playerName);
@@ -131,7 +131,7 @@ export default function CharadesPage() {
                 onChange={(e) => setGameId(e.target.value.toUpperCase())}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-game-primary focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                 placeholder="Enter game ID"
-                maxLength={8}
+                maxLength={5}
               />
             </div>
             <button

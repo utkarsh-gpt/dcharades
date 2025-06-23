@@ -169,7 +169,7 @@ export default function HeadToHeadChallenge({
       {/* Ready Button or Turn Button */}
       {isPlayerParticipating && (
         <div className="game-card text-center">
-          {!headToHead.isReady && !headToHead.isActive && (
+          {!headToHead.isReady && !headToHead.isActive && !headToHead.countdownActive && (
             <>
               <h4 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
                 Ready to Start?

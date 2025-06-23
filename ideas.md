@@ -21,12 +21,12 @@ Unique 2-Player Cards:
 1. **Duel Card** - Both players simultaneously reveal their next card. Higher number wins and gets to play again. If tied, both draw 2 cards.
 2. **Mirror Card** - Forces opponent to draw the same number of cards you currently have in your hand.
 3. **Swap Hands** - Exchange your entire hand with your opponent's hand.
-4. **Peek & Pick** - Look at opponent's hand and force them to discard a card of your choice.
+<!-- 4. **Peek & Pick** - Look at opponent's hand and force them to discard a card of your choice. -->
 5. **Double Down** - Play two cards of the same number/color simultaneously, opponent draws 4 cards.
 6. **Revenge Card** - Can only be played after opponent uses an action card against you. Doubles the effect back to them.
 7. **Shield Card** - Blocks the next action card played against you and reflects it back to opponent.
 8. **Time Bomb** - Opponent must play a card within 10 seconds or draw 3 cards.
-9. **Lucky Draw** - Draw 3 cards, keep one, opponent draws the other 2.
+<!-- 9. **Lucky Draw** - Draw 3 cards, keep one, opponent draws the other 2. -->
 10. **Final Stand** - Can only be played when you have 3 or fewer cards. Opponent draws cards equal to your hand size.
 
 Traditional Uno Cards:

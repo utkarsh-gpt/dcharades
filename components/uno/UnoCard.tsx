@@ -8,19 +8,23 @@ interface UnoCardProps {
   onClick?: () => void;
   isPlayable?: boolean;
   size?: 'small' | 'medium' | 'large';
+  isSelected?: boolean;
+  style?: React.CSSProperties;
 }
 
 export default function UnoCard({ 
   card, 
   onClick, 
   isPlayable = false, 
-  size = 'medium' 
+  size = 'medium',
+  isSelected = false,
+  style
 }: UnoCardProps) {
   const cardInfo = getCardDisplayInfo(card);
   
   const sizeClasses = {
     small: 'w-16 h-24 text-xs',
-    medium: 'w-20 h-30 text-sm',
+    medium: 'w-20 h-32 text-sm',
     large: 'w-24 h-36 text-base'
   };
 
@@ -51,10 +55,13 @@ export default function UnoCard({
         rounded-lg border-2 border-white shadow-lg
         flex flex-col items-center justify-center
         font-bold relative overflow-hidden
-        ${onClick && isPlayable ? 'cursor-pointer hover:scale-105 transform transition-all duration-200' : ''}
-        ${!isPlayable && onClick ? 'opacity-50 cursor-not-allowed' : ''}
+        transition-all duration-300 ease-in-out
+        ${onClick ? 'cursor-pointer hover:shadow-xl' : ''}
+        ${isSelected ? 'scale-110 shadow-2xl ring-4 ring-yellow-400 z-20' : ''}
+        ${onClick && !isSelected ? 'hover:scale-105' : ''}
       `}
       onClick={onClick && isPlayable ? onClick : undefined}
+      style={style}
     >
       {/* Card Content */}
       <div className="text-center p-1">
@@ -83,6 +90,8 @@ export default function UnoCard({
       {card.type === 'unique' && (
         <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-lg"></div>
       )}
+
+
     </div>
   );
 } 
