@@ -338,8 +338,8 @@ function getGameStateForClient(game) {
 }
 
 // UNO Game Management Functions
-function createUnoGame(gameId, hostPlayer) {
-  const deck = generateUnoDeck(true);
+function createUnoGame(gameId, hostPlayer, settings = DEFAULT_UNO_SETTINGS) {
+  const deck = generateUnoDeck(settings.includeUniqueCards);
   
   // Create players with initial hands
   const players = [
@@ -356,7 +356,7 @@ function createUnoGame(gameId, hostPlayer) {
   const game = {
     id: gameId,
     players,
-    settings: { ...DEFAULT_UNO_SETTINGS },
+    settings: { ...settings },
     currentPhase: 'lobby',
     currentPlayerIndex: 0,
     direction: 1,
@@ -1129,50 +1129,83 @@ io.on('connection', (socket) => {
   });
 
   // UNO Game Socket Events
+  socket.on('create-uno-game', ({ gameId, playerName, settings }) => {
+    try {
+      // Check if game already exists
+      if (games.has(gameId)) {
+        socket.emit('error', 'Game ID already exists');
+        return;
+      }
+      
+      // Create new UNO game
+      const hostPlayer = {
+        id: socket.id,
+        name: playerName,
+        isHost: true,
+        isReady: true, // Auto-ready
+      };
+      
+      const game = createUnoGame(gameId, hostPlayer, settings);
+      games.set(gameId, game);
+      
+      // Join socket room
+      socket.join(gameId);
+      playerSockets.set(socket.id, { gameId, playerName });
+      
+      // Emit game state with individual hands
+      const gameStateForPlayer = {
+        ...getUnoGameStateForClient(game),
+        playerHand: hostPlayer.hand || [],
+      };
+      io.to(socket.id).emit('unoGameState', gameStateForPlayer);
+      
+    } catch (error) {
+      socket.emit('error', 'Failed to create game');
+    }
+  });
+
   socket.on('join-uno-game', ({ gameId, playerName }) => {
     try {
-      let game = games.get(gameId);
+      const game = games.get(gameId);
       
       if (!game) {
-        // Create new UNO game
-        const hostPlayer = {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+      
+      // Clean up any stale players (players who have disconnected)
+      const connectedSockets = io.sockets.adapter.rooms.get(gameId);
+      if (connectedSockets) {
+        game.players = game.players.filter(p => connectedSockets.has(p.id));
+      }
+      
+      // Join existing game
+      if (game.players.length >= 2) {
+        socket.emit('error', 'Game is full');
+        return;
+      }
+      
+      if (game.isGameStarted) {
+        socket.emit('error', 'Game already started');
+        return;
+      }
+      
+      // Check if player already exists
+      const existingPlayer = game.players.find(p => p.id === socket.id);
+      if (!existingPlayer) {
+        const newPlayer = {
           id: socket.id,
           name: playerName,
-          isHost: true,
+          isHost: false,
           isReady: true, // Auto-ready
+          hand: [],
+          score: 0,
+          hasCalledUno: false,
+          shieldActive: false,
+          lastActionCard: null,
         };
         
-        game = createUnoGame(gameId, hostPlayer);
-        games.set(gameId, game);
-      } else {
-        // Join existing game
-        if (game.players.length >= 2) {
-          socket.emit('error', 'Game is full');
-          return;
-        }
-        
-        if (game.isGameStarted) {
-          socket.emit('error', 'Game already started');
-          return;
-        }
-        
-        // Check if player already exists
-        const existingPlayer = game.players.find(p => p.id === socket.id);
-        if (!existingPlayer) {
-          const newPlayer = {
-            id: socket.id,
-            name: playerName,
-            isHost: false,
-            isReady: true, // Auto-ready
-            hand: [],
-            score: 0,
-            hasCalledUno: false,
-            shieldActive: false,
-            lastActionCard: null,
-          };
-          
-          game.players.push(newPlayer);
-        }
+        game.players.push(newPlayer);
       }
       
       // Join socket room
@@ -1192,8 +1225,6 @@ io.on('connection', (socket) => {
         if (game.settings.timePerTurn > 0) {
           startUnoTurnTimer(gameId);
         }
-        
-
       }
       
       // Emit game state with individual hands
@@ -1631,6 +1662,21 @@ function handlePlayerLeave(socketId, gameId) {
   
   playerSockets.delete(socketId);
   
+  // Reset game state if it's a UNO game
+  if (game.settings && game.settings.gameType === 'uno') {
+    game.isGameStarted = false;
+    game.isActive = false;
+    game.currentPhase = 'lobby';
+    if (game.turnTimer) {
+      clearInterval(game.turnTimer);
+      game.turnTimer = null;
+    }
+    if (game.specialEffectTimer) {
+      clearInterval(game.specialEffectTimer);
+      game.specialEffectTimer = null;
+    }
+  }
+  
   if (game.players.length === 0) {
     // Delete empty game - clean up all timers
     if (game.roundTimer) {
@@ -1642,13 +1688,7 @@ function handlePlayerLeave(socketId, gameId) {
     if (game.countdownTimer) {
       clearInterval(game.countdownTimer);
     }
-    // UNO timers
-    if (game.turnTimer) {
-      clearInterval(game.turnTimer);
-    }
-    if (game.specialEffectTimer) {
-      clearInterval(game.specialEffectTimer);
-    }
+    // UNO timers already cleaned up above
     games.delete(gameId);
   } else {
     // Update host if needed
@@ -1673,8 +1713,8 @@ function handlePlayerLeave(socketId, gameId) {
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
     } else {
       // For other games
-    io.to(gameId).emit('game-state', getGameStateForClient(game));
-  }
+      io.to(gameId).emit('game-state', getGameStateForClient(game));
+    }
   }
 }
 

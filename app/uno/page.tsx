@@ -26,6 +26,7 @@ export default function UnoLobby() {
       // Store player info in localStorage for the game
       localStorage.setItem('unoPlayerName', playerName);
       localStorage.setItem('unoGameSettings', JSON.stringify(settings));
+      localStorage.setItem('unoIsHost', 'true');
       
       // Navigate to the game
       router.push(`/uno-game/${newGameId}`);
@@ -52,6 +53,7 @@ export default function UnoLobby() {
     try {
       // Store player info in localStorage for the game
       localStorage.setItem('unoPlayerName', playerName);
+      localStorage.setItem('unoIsHost', 'false');
       
       // Navigate to the game
       router.push(`/uno-game/${gameId.toUpperCase()}`);
