@@ -203,11 +203,28 @@ export default function UnoGamePage() {
 
   // Render appropriate component based on game phase
   if (gameState.currentPhase === 'lobby') {
+    const handleCopyGameId = () => {
+      navigator.clipboard.writeText(gameId);
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-red-500 via-yellow-500 to-blue-500 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 text-center">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 text-center max-w-md">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Game Lobby</h2>
           <p className="text-gray-600 mb-4">Players: {gameState.players.length}/2</p>
+          
+          {/* Game ID Section */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-500 mb-2">Share this code to invite a friend:</p>
+            <code 
+              onClick={handleCopyGameId}
+              className="bg-gray-100 hover:bg-gray-200 px-4 py-3 rounded-lg font-mono text-lg font-semibold text-gray-800 cursor-pointer transition-colors select-all"
+              title="Click to copy game ID"
+            >
+              {gameId}
+            </code>
+          </div>
+
           <div className="text-blue-600 font-medium">
             {gameState.players.length < 2 
               ? 'Waiting for another player to join...' 

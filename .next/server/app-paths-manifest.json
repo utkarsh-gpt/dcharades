@@ -1,3 +1,4 @@
 {
+  "/not-found": "app/not-found.js",
   "/uno-game/[gameId]/page": "app/uno-game/[gameId]/page.js"
 }
