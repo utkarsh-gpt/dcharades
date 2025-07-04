@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BlockbusterGameState, Player, MovieCard } from '@/lib/shared/types';
-import Timer from '../shared/Timer';
+import BlockbusterTimer from './BlockbusterTimer';
 
 interface MovieRoundGameplayProps {
   gameState: BlockbusterGameState;
@@ -10,7 +10,6 @@ interface MovieRoundGameplayProps {
   isCurrentPlayerTurn: boolean;
   onMovieRevealed: (movieId: string, category: 'oneWord' | 'dialogue' | 'actOut') => void;
   onMovieGuessed: (movieId: string) => void;
-  onSkipMovie: (movieId: string) => void;
   onRoundComplete: () => void;
 }
 
@@ -20,7 +19,6 @@ export default function MovieRoundGameplay({
   isCurrentPlayerTurn,
   onMovieRevealed,
   onMovieGuessed,
-  onSkipMovie,
   onRoundComplete,
 }: MovieRoundGameplayProps) {
 
@@ -69,10 +67,7 @@ export default function MovieRoundGameplay({
     onMovieGuessed(movieId);
   };
 
-  const handleSkip = (movieId: string) => {
-    if (!isCurrentPlayerTurn) return;
-    onSkipMovie(movieId);
-  };
+
 
   const getMovieByCategory = (assignments: any, category: 'oneWord' | 'dialogue' | 'actOut'): MovieCard | null => {
     if (!assignments) return null;
@@ -186,18 +181,12 @@ export default function MovieRoundGameplay({
         </button>
         
         {canInteract && (
-          <div className="flex space-x-2">
+          <div className="flex justify-center">
             <button
               onClick={() => handleMovieGuess(movie.id)}
-              className="flex-1 px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+              className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
             >
               ✅ Guessed
-            </button>
-            <button
-              onClick={() => handleSkip(movie.id)}
-              className="flex-1 px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            >
-              ⏭️ Skip
             </button>
           </div>
         )}
@@ -234,7 +223,7 @@ export default function MovieRoundGameplay({
 
       {/* Timer */}
       <div className="text-center mb-8">
-        <Timer
+        <BlockbusterTimer
           timeRemaining={gameState.timeRemaining}
           totalTime={gameState.settings.movieRoundTime}
           isActive={gameState.isActive}

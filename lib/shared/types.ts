@@ -184,8 +184,8 @@ export const DEFAULT_BLOCKBUSTER_SETTINGS: BlockbusterGameSettings = {
   movieCategories: ['bollywood'], // Focus on Bollywood
   gameType: 'blockbuster',
   maxPlayersPerTeam: 6,
-  headToHeadTime: 45, // 45 seconds for head-to-head
-  movieRoundTime: 60, // 60 seconds for movie rounds
+  headToHeadTime: 15, // 45 seconds for head-to-head
+  movieRoundTime: 30, // 60 seconds for movie rounds
 };
 
 export const TIME_LIMIT_OPTIONS = [

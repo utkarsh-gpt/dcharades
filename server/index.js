@@ -7,9 +7,6 @@ const {
   initializeDatabase,
   getRandomMovies,
   getRandomHeadToHeadCard: getRandomHeadToHeadCardFromDB,
-  findMovieByTitle,
-  getMoviesByGenre,
-  getAllMovies
 } = require('./db');
 
 const server = createServer();
@@ -46,7 +43,7 @@ const DEFAULT_UNO_SETTINGS = {
 
 // UNO Card Generation
 function createUnoCard(type, color, value, uniqueType = null) {
-    return {
+  return {
     id: uuidv4(),
     type,
     color,
@@ -107,11 +104,11 @@ function shuffleDeck(deck) {
 }
 
 // Database-powered movie functions
-async function getRandomMovieCards(count = 6, filters = {}) {
+async function getRandomMovieCards() {
   try {
-    const movies = await getRandomMovies(count, filters);
+    const movies = await getRandomMovies();
     return movies.map(movie => ({
-      id: movie.id.toString(),
+      id: movie.id ? movie.id.toString() : movie.title, // Use movie ID or fallback to title
       title: movie.title,
       genre: movie.genre,
       category: movie.category,
@@ -147,8 +144,8 @@ function createGame(gameId, hostPlayer) {
       movieCategories: ['bollywood'],
       gameType: 'blockbuster',
       maxPlayersPerTeam: 6,
-      headToHeadTime: 45,
-      movieRoundTime: 60,
+      headToHeadTime: 15,
+      movieRoundTime: 30,
     },
     currentPhase: 'lobby',
     headToHead: {
@@ -316,12 +313,132 @@ async function endHeadToHeadRound(gameId) {
   
   // Generate random movie cards from database
   try {
-    const movieCards = await getRandomMovieCards(6, { category: 'bollywood' });
+    const movieCards = await getRandomMovieCards();
     game.movieCards = movieCards;
   } catch (error) {
     game.movieCards = [];
   }
   
+  io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+}
+
+function startMovieRoundTimer(gameId) {
+  const game = games.get(gameId);
+  if (!game) return;
+
+  // Clear existing timer
+  if (game.movieRoundTimer) {
+    clearInterval(game.movieRoundTimer);
+  }
+
+  // Set initial time
+  game.timeRemaining = game.settings.movieRoundTime;
+
+  game.movieRoundTimer = setInterval(() => {
+    game.timeRemaining--;
+
+    if (game.timeRemaining <= 0) {
+      // Time's up - end current player's turn
+      clearInterval(game.movieRoundTimer);
+      game.movieRoundTimer = null;
+      
+      // Switch to next player or end round
+      switchMovieRoundPlayer(gameId);
+    }
+
+    // Broadcast updated game state
+    io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+  }, 1000);
+}
+
+function switchMovieRoundPlayer(gameId) {
+  const game = games.get(gameId);
+  if (!game || !game.roundState) return;
+
+  const currentPlayerIndex = game.roundState.currentPlayerIndex;
+  const nextPlayerIndex = (currentPlayerIndex + 1) % game.roundState.playersOrder.length;
+
+  // If we've completed a full cycle, check if round should end
+  if (nextPlayerIndex === 0) {
+    // Check if all movies have been revealed/guessed or if we should continue
+    const totalMovies = Object.keys(game.currentPlayerAssignments).length * 3; // 3 categories per player
+    const totalGuessed = game.roundState.guessedMovies.length;
+    
+    if (totalGuessed >= totalMovies) {
+      // Round complete - move to next head-to-head or end game
+      endMovieRound(gameId);
+      return;
+    }
+  }
+
+  // Switch to next player
+  game.roundState.currentPlayerIndex = nextPlayerIndex;
+  game.currentRoundPlayer = game.roundState.playersOrder[nextPlayerIndex];
+  game.timeRemaining = game.settings.movieRoundTime;
+  game.isActive = false; // Timer not active until first movie is revealed
+  game.roundState.isFirstMovieRevealed = false; // Reset for new player
+  game.roundState.currentPlayerScore = 0; // Reset score for new player
+
+  // Don't start timer yet - wait for first movie reveal by new player
+}
+
+function endMovieRound(gameId) {
+  const game = games.get(gameId);
+  if (!game) return;
+
+  // Clear movie round timer
+  if (game.movieRoundTimer) {
+    clearInterval(game.movieRoundTimer);
+    game.movieRoundTimer = null;
+  }
+
+  // Calculate scores and update teams
+  const headToHeadPlayers = [
+    game.headToHead.currentPlayers.teamA?.id,
+    game.headToHead.currentPlayers.teamB?.id
+  ].filter(Boolean);
+
+  headToHeadPlayers.forEach(playerId => {
+    const playerGuesses = game.roundState.guessedMovies.filter(guess => guess.playerId === playerId);
+    const playerTeam = game.teams.find(team => team.players.some(p => p.id === playerId));
+    
+    if (playerTeam) {
+      // Add unique genres to team's guessed genres
+      playerGuesses.forEach(guess => {
+        const assignment = game.currentPlayerAssignments[playerId];
+        if (assignment) {
+          const movieCard = Object.values(assignment).find(card => card.id === guess.movieId);
+          if (movieCard && !playerTeam.genresGuessed.includes(movieCard.genre)) {
+            playerTeam.genresGuessed.push(movieCard.genre);
+          }
+        }
+      });
+    }
+  });
+
+  // Check if game should end (e.g., after certain number of rounds)
+  if (game.roundHistory.length >= game.settings.rounds) {
+    // Game over
+    game.currentPhase = 'game-over';
+    
+    // Determine winner team
+    const sortedTeams = game.teams.sort((a, b) => b.genresGuessed.length - a.genresGuessed.length);
+    game.winner = sortedTeams[0];
+  } else {
+    // Start next head-to-head round
+    game.currentPhase = 'head-to-head';
+    
+    // Reset for next round
+    game.currentPlayerAssignments = {};
+    game.movieCards = [];
+    game.currentRoundPlayer = null;
+    game.currentField = null;
+    game.roundState = null;
+    
+    // Start new head-to-head round
+    startHeadToHeadRound(gameId);
+  }
+
   io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
 }
 
@@ -333,6 +450,7 @@ function getGameStateForClient(game) {
   delete clientGame.headToHeadTimer;
   delete clientGame.countdownTimer;
   delete clientGame.roundTimer;
+  delete clientGame.movieRoundTimer;
   
   return clientGame;
 }
@@ -508,7 +626,7 @@ function advanceUnoTurn(game) {
       // Check if player has shield active
       if (currentPlayer.shieldActive) {
         currentPlayer.shieldActive = false;
-      } else {
+  } else {
         // Player must draw all accumulated cards
         drawUnoCards(game, currentPlayer, game.drawCount);
       }
@@ -781,7 +899,7 @@ function startUnoTurnTimer(gameId) {
 }
 
 function startSpecialEffectTimer(gameId) {
-  const game = games.get(gameId);
+    const game = games.get(gameId);
   if (!game || !game.specialEffectActive.type) return;
 
   if (game.specialEffectTimer) {
@@ -1115,9 +1233,8 @@ io.on('connection', (socket) => {
       
       game.headToHead.submissions.push(submission);
       
-      // Add 2 seconds to timer (but don't exceed original time)
-      const maxTime = game.settings.headToHeadTime;
-      game.headToHead.timeRemaining = Math.min(game.headToHead.timeRemaining + 2, maxTime);
+      // Reset timer to 15 seconds after button press
+      game.headToHead.timeRemaining = 15;
 
       // Broadcast the updated game state
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
@@ -1125,6 +1242,246 @@ io.on('connection', (socket) => {
 
     } catch (error) {
       socket.emit('error', 'Failed to complete submission');
+    }
+  });
+
+  socket.on('movie-selection', ({ gameId, playerId, selectedMovies }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.currentPhase !== 'movie-selection') {
+        socket.emit('error', 'Movie selection is not available');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || player.id !== playerId) {
+        socket.emit('error', 'Invalid player');
+        return;
+      }
+
+      // Validate selectedMovies structure
+      if (!selectedMovies || !selectedMovies.oneWord || !selectedMovies.dialogue || !selectedMovies.actOut) {
+        socket.emit('error', 'Invalid movie selection. Must select movies for all three categories.');
+        return;
+      }
+
+      // Validate that all selected movie IDs exist in the game's movie cards
+      const availableMovieIds = game.movieCards.map(card => card.id);
+      const selectedMovieIds = [selectedMovies.oneWord, selectedMovies.dialogue, selectedMovies.actOut];
+      
+      for (const movieId of selectedMovieIds) {
+        if (!availableMovieIds.includes(movieId)) {
+          socket.emit('error', `Invalid movie selection: ${movieId} not found in available movies`);
+        return;
+        }
+      }
+
+      // Validate that all three selections are different
+      const uniqueSelections = new Set(selectedMovieIds);
+      if (uniqueSelections.size !== 3) {
+        socket.emit('error', 'Must select different movies for each category');
+        return;
+      }
+
+      // Check if player has already made a selection
+      if (game.currentPlayerAssignments && game.currentPlayerAssignments[playerId]) {
+        socket.emit('error', 'You have already made your movie selection');
+        return;
+      }
+
+      // Initialize currentPlayerAssignments if it doesn't exist
+      if (!game.currentPlayerAssignments) {
+        game.currentPlayerAssignments = {};
+      }
+
+      // Find the actual movie cards for the selections
+      const oneWordCard = game.movieCards.find(card => card.id === selectedMovies.oneWord);
+      const dialogueCard = game.movieCards.find(card => card.id === selectedMovies.dialogue);
+      const actOutCard = game.movieCards.find(card => card.id === selectedMovies.actOut);
+
+      // Store the player's movie assignments
+      game.currentPlayerAssignments[playerId] = {
+        oneWord: oneWordCard,
+        dialogue: dialogueCard,
+        actOut: actOutCard,
+      };
+
+      // Check if both players have made their selections
+      const headToHeadPlayers = [
+        game.headToHead.currentPlayers.teamA?.id,
+        game.headToHead.currentPlayers.teamB?.id
+      ].filter(Boolean);
+
+      const completedSelections = headToHeadPlayers.filter(pId => 
+        game.currentPlayerAssignments[pId]
+      );
+
+      // If both players have completed their selections, move to movie round
+      if (completedSelections.length === headToHeadPlayers.length) {
+        // Start movie round
+        game.currentPhase = 'movie-round';
+        
+        // Set up round state
+        const winner = game.headToHead.winner;
+        const loser = headToHeadPlayers.find(pId => pId !== winner);
+        
+        // Winner goes first
+        game.currentRoundPlayer = winner;
+        game.currentField = 'oneWord'; // Start with one word category
+        game.timeRemaining = game.settings.movieRoundTime;
+        game.isActive = false; // Timer not active until first movie is revealed
+        
+        // Initialize round state if it doesn't exist
+        if (!game.roundState) {
+        game.roundState = {
+            currentPlayerIndex: 0,
+            playersOrder: [winner, loser],
+            revealedMovies: [],
+            guessedMovies: [],
+          isFirstMovieRevealed: false,
+          currentPlayerScore: 0,
+        };
+        }
+
+        // Don't start timer yet - wait for first movie reveal
+      }
+
+      // Broadcast updated game state
+      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+
+    } catch (error) {
+      socket.emit('error', 'Failed to process movie selection');
+    }
+  });
+
+  socket.on('movie-revealed', ({ gameId, movieId, category }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.currentPhase !== 'movie-round') {
+        socket.emit('error', 'Movie round is not active');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || player.id !== game.currentRoundPlayer) {
+        socket.emit('error', 'Not your turn');
+        return;
+      }
+
+      // Initialize roundState if it doesn't exist
+      if (!game.roundState) {
+        game.roundState = {
+          currentPlayerIndex: 0,
+          playersOrder: [game.currentRoundPlayer],
+          revealedMovies: [],
+          guessedMovies: [],
+          isFirstMovieRevealed: false,
+          currentPlayerScore: 0,
+        };
+      }
+
+      // Check if movie is already revealed
+      const isAlreadyRevealed = game.roundState.revealedMovies.some(m => m.movieId === movieId);
+      if (isAlreadyRevealed) {
+        socket.emit('error', 'Movie already revealed');
+        return;
+      }
+
+      // Add movie to revealed list
+      game.roundState.revealedMovies.push({
+        movieId,
+        category,
+        playerId: game.currentRoundPlayer,
+        timestamp: Date.now()
+      });
+
+      // Start timer on first movie reveal
+      if (!game.roundState.isFirstMovieRevealed) {
+        game.roundState.isFirstMovieRevealed = true;
+        game.isActive = true;
+        startMovieRoundTimer(gameId);
+      }
+
+      // Broadcast updated game state
+      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+
+    } catch (error) {
+      socket.emit('error', 'Failed to reveal movie');
+    }
+  });
+
+  socket.on('movie-guessed', ({ gameId, movieId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.currentPhase !== 'movie-round') {
+        socket.emit('error', 'Movie round is not active');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || player.id !== game.currentRoundPlayer) {
+        socket.emit('error', 'Not your turn');
+        return;
+      }
+
+      if (!game.roundState) {
+        socket.emit('error', 'Round state not initialized');
+        return;
+      }
+
+      // Check if movie is revealed and not already guessed
+      const isRevealed = game.roundState.revealedMovies.some(m => m.movieId === movieId);
+      const isAlreadyGuessed = game.roundState.guessedMovies.some(m => m.movieId === movieId);
+      
+      if (!isRevealed) {
+        socket.emit('error', 'Movie must be revealed first');
+        return;
+      }
+      
+      if (isAlreadyGuessed) {
+        socket.emit('error', 'Movie already guessed');
+        return;
+      }
+
+      // Add movie to guessed list
+      game.roundState.guessedMovies.push({
+        movieId,
+        playerId: game.currentRoundPlayer,
+        timestamp: Date.now()
+      });
+
+      // Increment player score
+      game.roundState.currentPlayerScore++;
+
+      // Broadcast updated game state
+      io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
+
+    } catch (error) {
+      socket.emit('error', 'Failed to guess movie');
+    }
+  });
+
+
+
+  socket.on('round-complete', ({ gameId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game || game.currentPhase !== 'movie-round') {
+        socket.emit('error', 'Movie round is not active');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || player.id !== game.currentRoundPlayer) {
+        socket.emit('error', 'Not your turn');
+        return;
+      }
+
+      // End current player's turn and switch to next player
+      switchMovieRoundPlayer(gameId);
+
+    } catch (error) {
+      socket.emit('error', 'Failed to complete round');
     }
   });
 
@@ -1136,7 +1493,7 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Game ID already exists');
         return;
       }
-      
+
       // Create new UNO game
       const hostPlayer = {
         id: socket.id,
@@ -1158,7 +1515,7 @@ io.on('connection', (socket) => {
         playerHand: hostPlayer.hand || [],
       };
       io.to(socket.id).emit('unoGameState', gameStateForPlayer);
-      
+
     } catch (error) {
       socket.emit('error', 'Failed to create game');
     }
@@ -1169,10 +1526,10 @@ io.on('connection', (socket) => {
       const game = games.get(gameId);
       
       if (!game) {
-        socket.emit('error', 'Game not found');
-        return;
-      }
-      
+          socket.emit('error', 'Game not found');
+          return;
+        }
+        
       // Clean up any stale players (players who have disconnected)
       const connectedSockets = io.sockets.adapter.rooms.get(gameId);
       if (connectedSockets) {
@@ -1180,11 +1537,11 @@ io.on('connection', (socket) => {
       }
       
       // Join existing game
-      if (game.players.length >= 2) {
-        socket.emit('error', 'Game is full');
-        return;
-      }
-      
+        if (game.players.length >= 2) {
+          socket.emit('error', 'Game is full');
+          return;
+        }
+        
       if (game.isGameStarted) {
         socket.emit('error', 'Game already started');
         return;
@@ -1243,23 +1600,23 @@ io.on('connection', (socket) => {
 
   socket.on('uno-player-ready', ({ gameId }) => {
     try {
-      const game = games.get(gameId);
+    const game = games.get(gameId);
       if (!game) {
         socket.emit('error', 'Game not found');
         return;
       }
-
-      const player = game.players.find(p => p.id === socket.id);
+    
+    const player = game.players.find(p => p.id === socket.id);
       if (!player) {
         socket.emit('error', 'Player not found');
         return;
       }
-
+    
       // Toggle ready status
-      player.isReady = !player.isReady;
+    player.isReady = !player.isReady;
       
       // Emit updated game state
-      io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
       
     } catch (error) {
       socket.emit('error', 'Failed to update ready status');
@@ -1268,13 +1625,13 @@ io.on('connection', (socket) => {
 
   socket.on('start-uno-game', ({ gameId }) => {
     try {
-      const game = games.get(gameId);
+    const game = games.get(gameId);
       if (!game) {
         socket.emit('error', 'Game not found');
         return;
       }
-
-      const player = game.players.find(p => p.id === socket.id);
+    
+    const player = game.players.find(p => p.id === socket.id);
       if (!player || !player.isHost) {
         socket.emit('error', 'Only host can start the game');
         return;
@@ -1286,17 +1643,17 @@ io.on('connection', (socket) => {
       }
 
       if (!game.players.every(p => p.isReady)) {
-        socket.emit('error', 'All players must be ready');
-        return;
-      }
-      
+      socket.emit('error', 'All players must be ready');
+      return;
+    }
+    
       // Initialize game
       dealUnoCards(game);
       game.currentPhase = 'playing';
-      game.isGameStarted = true;
-      game.isActive = true;
-      game.currentPlayerIndex = 0;
-      
+    game.isGameStarted = true;
+    game.isActive = true;
+    game.currentPlayerIndex = 0;
+    
       // Start turn timer
       startUnoTurnTimer(gameId);
       
@@ -1346,9 +1703,9 @@ io.on('connection', (socket) => {
       // Special validations for unique cards
       if (card.type === 'unique') {
         if (card.uniqueType === 'final-stand' && player.hand.length > 3) {
-          return;
-        }
-        
+        return;
+      }
+      
         if (card.uniqueType === 'revenge' && !game.players.find(p => p.id !== socket.id)?.lastActionCard) {
           return;
         }
@@ -1406,11 +1763,11 @@ io.on('connection', (socket) => {
       game.drawCount = 0;
       
       // Advance turn
-      advanceUnoTurn(game);
+        advanceUnoTurn(game);
       
       // Start new turn timer
       if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
-        startUnoTurnTimer(gameId);
+          startUnoTurnTimer(gameId);
       }
       
       // Emit updated game state
@@ -1434,8 +1791,8 @@ io.on('connection', (socket) => {
         socket.emit('error', 'Game not active');
         return;
       }
-
-            const player = game.players.find(p => p.id === socket.id);
+      
+      const player = game.players.find(p => p.id === socket.id);
       if (!player) {
         return;
       }
@@ -1504,11 +1861,11 @@ io.on('connection', (socket) => {
       }
       
       // Advance turn
-      advanceUnoTurn(game);
+        advanceUnoTurn(game);
       
       // Start turn timer
       if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
-        startUnoTurnTimer(gameId);
+          startUnoTurnTimer(gameId);
       }
       
       // Emit updated game state
@@ -1519,7 +1876,7 @@ io.on('connection', (socket) => {
         };
         io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
       });
-
+      
     } catch (error) {
       socket.emit('error', 'Failed to handle peek-pick');
     }
@@ -1527,13 +1884,13 @@ io.on('connection', (socket) => {
 
   socket.on('next-uno-round', ({ gameId }) => {
     try {
-      const game = games.get(gameId);
+    const game = games.get(gameId);
       if (!game || game.currentPhase !== 'round-ended') {
         socket.emit('error', 'Cannot start next round');
         return;
       }
-      
-      const player = game.players.find(p => p.id === socket.id);
+    
+    const player = game.players.find(p => p.id === socket.id);
       if (!player || !player.isHost) {
         socket.emit('error', 'Only host can start next round');
         return;
@@ -1713,8 +2070,8 @@ function handlePlayerLeave(socketId, gameId) {
       io.to(gameId).emit('blockbuster-game-state', getGameStateForClient(game));
     } else {
       // For other games
-      io.to(gameId).emit('game-state', getGameStateForClient(game));
-    }
+    io.to(gameId).emit('game-state', getGameStateForClient(game));
+  }
   }
 }
 

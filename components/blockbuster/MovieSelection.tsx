@@ -36,10 +36,10 @@ export default function MovieSelection({
     const headToHeadWinner = gameState.headToHead.winner;
     const isWinner = headToHeadWinner === currentPlayer.id;
     
-    // Check if current player already has assignments
+    // Check if current player already has COMPLETED assignments (all 3 movies assigned)
     const currentAssignment = gameState.currentPlayerAssignments[currentPlayer.id];
-    if (currentAssignment) {
-      // Player has already made selections, show them
+    if (currentAssignment && currentAssignment.oneWord && currentAssignment.dialogue && currentAssignment.actOut) {
+      // Player has already made complete selections, show them
       setMovieSlots({
         available: [],
         oneWord: currentAssignment.oneWord,
@@ -64,7 +64,7 @@ export default function MovieSelection({
     } else {
         // Check if winner has already selected movies
         const winnerAssignment = headToHeadWinner ? gameState.currentPlayerAssignments[headToHeadWinner] : null;
-        if (winnerAssignment) {
+        if (winnerAssignment && winnerAssignment.oneWord && winnerAssignment.dialogue && winnerAssignment.actOut) {
         // Winner has selected, get the remaining 3 cards
         const usedMovieIds = [
           winnerAssignment.oneWord.id,
@@ -152,6 +152,7 @@ export default function MovieSelection({
       return;
     }
 
+    // Only send the selection to server when confirmed
     onMovieSelection({
       oneWord: movieSlots.oneWord.id,
       dialogue: movieSlots.dialogue.id,

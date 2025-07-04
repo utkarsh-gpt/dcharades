@@ -4,16 +4,16 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
 // Initialize Turso client
 const client = createClient({
-  url: process.env.DATABASE_URL || 'file:movies.db', // Fallback to local SQLite
+  url: process.env.DATABASE_URL || 'file:Movies.db', // Fallback to local SQLite
   authToken: process.env.DATABASE_TOKEN,
 });
 
 // Database schema and initialization
 async function initializeDatabase() {
   try {
-    // Create movies table
+    // Create Movies table
     await client.execute(`
-      CREATE TABLE IF NOT EXISTS movies (
+      CREATE TABLE IF NOT EXISTS Movies (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL UNIQUE,
         genre TEXT NOT NULL,
@@ -44,81 +44,11 @@ async function initializeDatabase() {
 // Seed initial movie data
 async function seedInitialData() {
   try {
-    // Check if movies table has data
+    // Check if Movies table has data
     const movieCount = await client.execute('SELECT COUNT(*) as count FROM movies');
     
-    if (movieCount.rows[0].count === 0) {
-      
-      const initialMovies = [
-        // Bollywood Action Movies
-        { title: 'War', genre: 'Action', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Baaghi', genre: 'Action', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Don', genre: 'Action', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Dhoom', genre: 'Action', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Singham', genre: 'Action', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Tiger Zinda Hai', genre: 'Action', difficulty: 'medium', category: 'bollywood' },
-        { title: 'URI: The Surgical Strike', genre: 'Action', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Batla House', genre: 'Action', difficulty: 'hard', category: 'bollywood' },
-        
-        // Bollywood Romance Movies
-        { title: 'Dilwale Dulhania Le Jayenge', genre: 'Romance', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Kuch Kuch Hota Hai', genre: 'Romance', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Jab We Met', genre: 'Romance', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Yeh Jawaani Hai Deewani', genre: 'Romance', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Zindagi Na Milegi Dobara', genre: 'Romance', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Ae Dil Hai Mushkil', genre: 'Romance', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Tamasha', genre: 'Romance', difficulty: 'hard', category: 'bollywood' },
-        
-        // Bollywood Comedy Movies
-        { title: '3 Idiots', genre: 'Comedy', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Golmaal', genre: 'Comedy', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Housefull', genre: 'Comedy', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Hera Pheri', genre: 'Comedy', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Munna Bhai MBBS', genre: 'Comedy', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Hindi Medium', genre: 'Comedy', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Badhaai Ho', genre: 'Comedy', difficulty: 'hard', category: 'bollywood' },
-        
-        // Bollywood Drama Movies
-        { title: 'Dangal', genre: 'Drama', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Taare Zameen Par', genre: 'Drama', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Pink', genre: 'Drama', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Masaan', genre: 'Drama', difficulty: 'hard', category: 'bollywood' },
-        
-        // Bollywood Sports Movies
-        { title: 'Sultan', genre: 'Sports', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Mary Kom', genre: 'Sports', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Bhaag Milkha Bhaag', genre: 'Sports', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Chak De! India', genre: 'Sports', difficulty: 'medium', category: 'bollywood' },
-        
-        // Bollywood Historical Movies
-        { title: 'Padmaavat', genre: 'Historical', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Bajirao Mastani', genre: 'Historical', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Jodhaa Akbar', genre: 'Historical', difficulty: 'hard', category: 'bollywood' },
-        
-        // Bollywood Horror Movies
-        { title: 'Stree', genre: 'Horror', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Tumhari Sulu', genre: 'Horror', difficulty: 'medium', category: 'bollywood' },
-        
-        // Bollywood Family Movies
-        { title: 'Kabhi Khushi Kabhie Gham', genre: 'Family', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Hum Aapke Hain Koun..!', genre: 'Family', difficulty: 'easy', category: 'bollywood' },
-        { title: 'Kapoor & Sons', genre: 'Family', difficulty: 'medium', category: 'bollywood' },
-        
-        // Bollywood Biopic Movies
-        { title: 'M.S. Dhoni: The Untold Story', genre: 'Biopic', difficulty: 'medium', category: 'bollywood' },
-        { title: 'Neerja', genre: 'Biopic', difficulty: 'medium', category: 'bollywood' },
-      ];
-
-      // Insert movies in batch
-      for (const movie of initialMovies) {
-        await client.execute({
-          sql: 'INSERT OR IGNORE INTO movies (title, genre, difficulty, category) VALUES (?, ?, ?, ?)',
-          args: [movie.title, movie.genre, movie.difficulty, movie.category]
-        });
-      }
-      
-
-    }
+    // Movies table is ready - no hardcoded seeding needed
+    // Data should be added via database management tools or bulk import
 
     // Check and seed head-to-head cards
     const cardCount = await client.execute('SELECT COUNT(*) as count FROM head_to_head_cards');
@@ -163,120 +93,10 @@ async function seedInitialData() {
   }
 }
 
-// Movie database functions
-async function getAllMovies() {
+// Core game functions only
+async function getRandomMovies() {
   try {
-    const result = await client.execute('SELECT * FROM movies ORDER BY title');
-    return result.rows;
-  } catch (error) {
-    return [];
-  }
-}
-
-async function getMoviesByGenre(genre) {
-  try {
-    const result = await client.execute({
-      sql: 'SELECT * FROM movies WHERE genre = ? ORDER BY title',
-      args: [genre]
-    });
-    return result.rows;
-  } catch (error) {
-    return [];
-  }
-}
-
-async function getMoviesByCategory(category) {
-  try {
-    const result = await client.execute({
-      sql: 'SELECT * FROM movies WHERE category = ? ORDER BY title',
-      args: [category]
-    });
-    return result.rows;
-  } catch (error) {
-    return [];
-  }
-}
-
-async function getMoviesByDifficulty(difficulty) {
-  try {
-    const result = await client.execute({
-      sql: 'SELECT * FROM movies WHERE difficulty = ? ORDER BY title',
-      args: [difficulty]
-    });
-    return result.rows;
-  } catch (error) {
-    return [];
-  }
-}
-
-async function getRandomMovies(count = 6, filters = {}) {
-  try {
-    let sql = 'SELECT * FROM movies';
-    let args = [];
-    let conditions = [];
-
-    // Add filters
-    if (filters.genre) {
-      conditions.push('genre = ?');
-      args.push(filters.genre);
-    }
-    
-    if (filters.category) {
-      conditions.push('category = ?');
-      args.push(filters.category);
-    }
-    
-    if (filters.difficulty) {
-      conditions.push('difficulty = ?');
-      args.push(filters.difficulty);
-    }
-
-    if (conditions.length > 0) {
-      sql += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    sql += ' ORDER BY RANDOM() LIMIT ?';
-    args.push(count);
-
-    const result = await client.execute({
-      sql,
-      args
-    });
-    
-    return result.rows;
-  } catch (error) {
-    return [];
-  }
-}
-
-async function addMovie(title, genre, difficulty, category) {
-  try {
-    await client.execute({
-      sql: 'INSERT INTO movies (title, genre, difficulty, category) VALUES (?, ?, ?, ?)',
-      args: [title, genre, difficulty, category]
-    });
-    return true;
-  } catch (error) {
-    return false;
-  }
-}
-
-async function findMovieByTitle(title) {
-  try {
-    const result = await client.execute({
-      sql: 'SELECT * FROM movies WHERE LOWER(title) = LOWER(?)',
-      args: [title]
-    });
-    return result.rows[0] || null;
-  } catch (error) {
-    return null;
-  }
-}
-
-// Head-to-head card functions
-async function getAllHeadToHeadCards() {
-  try {
-    const result = await client.execute('SELECT * FROM head_to_head_cards');
+    const result = await client.execute('SELECT * FROM movies ORDER BY RANDOM() LIMIT 6');
     return result.rows;
   } catch (error) {
     return [];
@@ -295,13 +115,6 @@ async function getRandomHeadToHeadCard() {
 module.exports = {
   client,
   initializeDatabase,
-  getAllMovies,
-  getMoviesByGenre,
-  getMoviesByCategory,
-  getMoviesByDifficulty,
   getRandomMovies,
-  addMovie,
-  findMovieByTitle,
-  getAllHeadToHeadCards,
   getRandomHeadToHeadCard,
 }; 

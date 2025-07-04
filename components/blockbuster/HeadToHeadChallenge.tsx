@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { BlockbusterGameState, Player } from '@/lib/shared/types';
-import Timer from '../shared/Timer';
+import BlockbusterTimer from './BlockbusterTimer';
+import { useTimerSounds } from '@/lib/blockbuster/useTimerSounds';
 
 interface HeadToHeadChallengeProps {
   gameState: BlockbusterGameState;
@@ -16,9 +17,13 @@ export default function HeadToHeadChallenge({
   onSubmitMovie,
 }: HeadToHeadChallengeProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { playStartSound } = useTimerSounds();
 
   const handleButtonPress = async () => {
     if (isSubmitting || !gameState.headToHead.isActive) return;
+
+    // Play start sound immediately when button is pressed
+    playStartSound();
 
     setIsSubmitting(true);
     try {
@@ -108,7 +113,7 @@ export default function HeadToHeadChallenge({
         {/* Timer - only show when active */}
         {headToHead.isActive && (
           <div className="mb-6">
-            <Timer
+            <BlockbusterTimer
               timeRemaining={headToHead.timeRemaining}
               totalTime={gameState.settings.headToHeadTime}
               isActive={headToHead.isActive}
@@ -235,8 +240,8 @@ export default function HeadToHeadChallenge({
           <li>• Press "Ready to Play!" when both players are prepared</li>
           <li>• A 3-second countdown will begin the round</li>
           <li>• Players take turns saying movies that fit the category out loud</li>
-          <li>• After saying a movie, press the button to add time and switch turns</li>
-          <li>• Each turn adds 2 seconds to the timer</li>
+          <li>• After saying a movie, press the button to reset the timer and switch turns</li>
+          <li>• Each button press resets the timer to 15 seconds</li>
           <li>• The round continues until the timer runs out</li>
           <li>• The last player to successfully take a turn wins!</li>
           <li>• Winner gets 6 movie cards for the next phase</li>

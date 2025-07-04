@@ -28,19 +28,31 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001', {
       transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+      timeout: 20000,
     });
 
     socketInstance.on('connect', () => {
+      console.log('Socket connected:', socketInstance.id);
       setConnected(true);
     });
 
-    socketInstance.on('disconnect', () => {
+    socketInstance.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      setConnected(false);
+    });
+
+    socketInstance.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
       setConnected(false);
     });
 
     setSocket(socketInstance);
 
     return () => {
+      console.log('Cleaning up socket connection');
       socketInstance.disconnect();
     };
   }, []);

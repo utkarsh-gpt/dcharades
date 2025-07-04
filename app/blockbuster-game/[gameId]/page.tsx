@@ -42,8 +42,8 @@ export default function BlockbusterGameRoom() {
             movieCategories: ['bollywood'],
             gameType: 'blockbuster',
             maxPlayersPerTeam: 6,
-            headToHeadTime: 45,
-            movieRoundTime: 60,
+            headToHeadTime: 15,
+            movieRoundTime: 30,
           }
         });
       } else {
@@ -125,11 +125,11 @@ export default function BlockbusterGameRoom() {
   const handleHeadToHeadSubmission = useCallback((movieTitle: string) => {
     if (socket && currentPlayer) {
       // Always use head-to-head-submission event for both ready signal and movie submissions
-      socket.emit('head-to-head-submission', {
-        gameId,
-        playerId: currentPlayer.id,
-        movieTitle,
-      });
+        socket.emit('head-to-head-submission', {
+          gameId,
+          playerId: currentPlayer.id,
+          movieTitle,
+        });
     }
   }, [socket, gameId, currentPlayer]);
 
@@ -165,15 +165,7 @@ export default function BlockbusterGameRoom() {
     }
   }, [socket, gameId, currentPlayer]);
 
-  // Handle skip movie
-  const handleSkipMovie = useCallback((movieId: string) => {
-    if (socket && currentPlayer) {
-      socket.emit('skip-movie', {
-        gameId,
-        movieId,
-      });
-    }
-  }, [socket, gameId, currentPlayer]);
+
 
   // Handle player ready
   const handlePlayerReady = useCallback(() => {
@@ -289,7 +281,6 @@ export default function BlockbusterGameRoom() {
                 isCurrentPlayerTurn={currentPlayer.id === gameState.currentRoundPlayer}
                 onMovieRevealed={handleMovieRevealed}
                 onMovieGuessed={handleMovieGuessed}
-                onSkipMovie={handleSkipMovie}
                 onRoundComplete={() => {
                   if (socket && currentPlayer) {
                     socket.emit('round-complete', {
