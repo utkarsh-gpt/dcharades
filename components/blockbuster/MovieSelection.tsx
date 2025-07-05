@@ -29,7 +29,7 @@ export default function MovieSelection({
   });
 
   const [hasSubmitted, setHasSubmitted] = useState(false);
-  const [draggedMovie, setDraggedMovie] = useState<MovieCard | null>(null);
+  const [selectedMovie, setSelectedMovie] = useState<MovieCard | null>(null);
 
   // Initialize available movies based on head-to-head winner
   useEffect(() => {
@@ -91,59 +91,47 @@ export default function MovieSelection({
     }
   }, [gameState.movieCards, gameState.headToHead.winner, gameState.currentPlayerAssignments, currentPlayer.id]);
 
-  const handleDragStart = (e: React.DragEvent, movie: MovieCard, source: string) => {
-    setDraggedMovie(movie);
-    e.dataTransfer.setData('text/plain', JSON.stringify({ movie, source }));
+  const handleMovieClick = (movie: MovieCard) => {
+    setSelectedMovie(selectedMovie?.id === movie.id ? null : movie);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent, targetSlot: 'available' | 'oneWord' | 'dialogue' | 'actOut') => {
-    e.preventDefault();
-    
-    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-    const { movie, source } = data;
-    
-    if (source === targetSlot) return; // No change needed
+  const handleCategoryClick = (category: 'oneWord' | 'dialogue' | 'actOut') => {
+    if (!selectedMovie) return;
     
     const newMovieSlots = { ...movieSlots };
     
-    // Remove from source
-    if (source === 'available') {
-      newMovieSlots.available = newMovieSlots.available.filter(m => m.id !== movie.id);
-    } else if (source === 'oneWord') {
+    // Remove selected movie from its current location
+    if (movieSlots.available.some(m => m.id === selectedMovie.id)) {
+      newMovieSlots.available = newMovieSlots.available.filter(m => m.id !== selectedMovie.id);
+    } else if (movieSlots.oneWord?.id === selectedMovie.id) {
       newMovieSlots.oneWord = null;
-    } else if (source === 'dialogue') {
+    } else if (movieSlots.dialogue?.id === selectedMovie.id) {
       newMovieSlots.dialogue = null;
-    } else if (source === 'actOut') {
+    } else if (movieSlots.actOut?.id === selectedMovie.id) {
       newMovieSlots.actOut = null;
     }
     
-    // Add to target
-    if (targetSlot === 'available') {
-      newMovieSlots.available.push(movie);
-    } else if (targetSlot === 'oneWord') {
-      // If slot is occupied, move existing movie back to available
-      if (newMovieSlots.oneWord) {
-        newMovieSlots.available.push(newMovieSlots.oneWord);
-      }
-      newMovieSlots.oneWord = movie;
-    } else if (targetSlot === 'dialogue') {
-      if (newMovieSlots.dialogue) {
-        newMovieSlots.available.push(newMovieSlots.dialogue);
-      }
-      newMovieSlots.dialogue = movie;
-    } else if (targetSlot === 'actOut') {
-      if (newMovieSlots.actOut) {
-        newMovieSlots.available.push(newMovieSlots.actOut);
-      }
-      newMovieSlots.actOut = movie;
+    // If target category already has a movie, move it back to available
+    if (newMovieSlots[category]) {
+      newMovieSlots.available.push(newMovieSlots[category]!);
     }
     
+    // Place selected movie in target category
+    newMovieSlots[category] = selectedMovie;
+    
     setMovieSlots(newMovieSlots);
-    setDraggedMovie(null);
+    setSelectedMovie(null);
+  };
+
+  const handleCategorizedMovieDoubleClick = (movie: MovieCard, category: 'oneWord' | 'dialogue' | 'actOut') => {
+    const newMovieSlots = { ...movieSlots };
+    
+    // Remove from category and add back to available
+    newMovieSlots[category] = null;
+    newMovieSlots.available.push(movie);
+    
+    setMovieSlots(newMovieSlots);
+    setSelectedMovie(null);
   };
 
   const handleSubmitSelection = () => {
@@ -166,17 +154,27 @@ export default function MovieSelection({
   const headToHeadWinner = gameState.headToHead.winner;
   const isWinner = headToHeadWinner === currentPlayer.id;
 
-  const MovieCard = ({ movie, source, isDraggedOver = false }: { 
+  const MovieCard = ({ 
+    movie, 
+    isSelected = false, 
+    isClickable = true,
+    onClick,
+    onDoubleClick 
+  }: { 
     movie: MovieCard; 
-    source: string; 
-    isDraggedOver?: boolean;
+    isSelected?: boolean;
+    isClickable?: boolean;
+    onClick?: () => void;
+    onDoubleClick?: () => void;
   }) => (
     <div
-      draggable
-      onDragStart={(e) => handleDragStart(e, movie, source)}
-      className={`p-3 rounded-lg border cursor-move transition-all hover:shadow-md ${
-        isDraggedOver
-          ? 'border-blue-400 bg-blue-50 dark:bg-blue-900/20'
+      onClick={isClickable ? onClick : undefined}
+      onDoubleClick={onDoubleClick}
+      className={`p-3 rounded-lg border transition-all ${
+        isClickable ? 'cursor-pointer hover:shadow-md' : 'cursor-default'
+      } ${
+        isSelected
+          ? 'border-blue-500 bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-300'
           : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700'
       }`}
     >
@@ -189,14 +187,14 @@ export default function MovieSelection({
     </div>
   );
 
-  const DropZone = ({ 
-    slotId, 
+  const CategoryBox = ({ 
+    category,
     title, 
     icon, 
     movie, 
     color 
   }: { 
-    slotId: 'available' | 'oneWord' | 'dialogue' | 'actOut';
+    category: 'oneWord' | 'dialogue' | 'actOut';
     title: string;
     icon: string;
     movie: MovieCard | null;
@@ -207,15 +205,20 @@ export default function MovieSelection({
         {icon} {title}
       </h3>
       <div
-        onDragOver={handleDragOver}
-        onDrop={(e) => handleDrop(e, slotId)}
-        className={`min-h-[200px] p-4 rounded-lg border-2 border-dashed transition-colors ${color}`}
+        onClick={() => handleCategoryClick(category)}
+        className={`min-h-[200px] p-4 rounded-lg border-2 transition-all ${
+          selectedMovie ? 'cursor-pointer hover:border-blue-400' : 'cursor-default'
+        } ${color}`}
       >
         {movie ? (
-          <MovieCard movie={movie} source={slotId} />
+          <MovieCard 
+            movie={movie} 
+            isClickable={false}
+            onDoubleClick={() => handleCategorizedMovieDoubleClick(movie, category)}
+          />
         ) : (
           <div className="text-center text-gray-400 dark:text-gray-500 mt-16">
-            Drop a movie here
+            {selectedMovie ? 'Tap to place movie here' : 'Select a movie first'}
           </div>
         )}
       </div>
@@ -234,11 +237,17 @@ export default function MovieSelection({
             : "⏳ Waiting for the winner to select movies, then you'll arrange your 3 movies."
           }
         </p>
-        <p className="text-sm text-gray-500 dark:text-gray-500 mb-2">
-          Drag movies into the categories: One Word, Dialogue, and Act It Out
-        </p>
-        
-
+        <div className="text-sm text-gray-500 dark:text-gray-500 mb-2 space-y-1">
+          <p>📱 Tap a movie to select it, then tap a category to move it</p>
+          <p>👆 Double-tap a categorized movie to return it to available</p>
+        </div>
+        {selectedMovie && (
+          <div className="inline-block px-4 py-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg border border-blue-300 dark:border-blue-600 mt-2">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              Selected: {selectedMovie.title}
+            </p>
+          </div>
+        )}
       </div>
 
       {hasSubmitted ? (
@@ -260,14 +269,15 @@ export default function MovieSelection({
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4 text-center">
               Available Movies
             </h3>
-            <div
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, 'available')}
-              className="min-h-[400px] p-4 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800"
-            >
+            <div className="min-h-[400px] p-4 rounded-lg border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800">
               <div className="space-y-3">
                 {movieSlots.available.map((movie) => (
-                  <MovieCard key={movie.id} movie={movie} source="available" />
+                  <MovieCard 
+                    key={movie.id} 
+                    movie={movie} 
+                    isSelected={selectedMovie?.id === movie.id}
+                    onClick={() => handleMovieClick(movie)}
+                  />
                 ))}
               </div>
             </div>
@@ -276,24 +286,24 @@ export default function MovieSelection({
           {/* Category Slots */}
           <div className="lg:col-span-3">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <DropZone
-                slotId="oneWord"
+              <CategoryBox
+                category="oneWord"
                 title="One Word"
                 icon="🎯"
                 movie={movieSlots.oneWord}
                 color="border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/20"
               />
               
-              <DropZone
-                slotId="dialogue"
+              <CategoryBox
+                category="dialogue"
                 title="Dialogue"
                 icon="💬"
                 movie={movieSlots.dialogue}
                 color="border-yellow-300 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/20"
               />
               
-              <DropZone
-                slotId="actOut"
+              <CategoryBox
+                category="actOut"
                 title="Act It Out"
                 icon="🎭"
                 movie={movieSlots.actOut}

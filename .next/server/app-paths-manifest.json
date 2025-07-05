@@ -1,5 +1,3 @@
 {
-  "/not-found": "app/not-found.js",
-  "/blockbuster/page": "app/blockbuster/page.js",
   "/blockbuster-game/[gameId]/page": "app/blockbuster-game/[gameId]/page.js"
 }
