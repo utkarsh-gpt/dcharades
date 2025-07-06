@@ -43,8 +43,6 @@ export default function MovieRoundGameplay({
   const otherPlayerId = gameState.roundState?.playersOrder?.find(id => id !== currentRoundPlayer);
   const otherPlayerAssignments = gameState.currentPlayerAssignments[otherPlayerId || ''];
 
-
-
   const handleMovieReveal = (movieId: string, category: 'oneWord' | 'dialogue' | 'actOut') => {
     if (!isCurrentPlayerTurn) return;
     
@@ -67,8 +65,6 @@ export default function MovieRoundGameplay({
     onMovieGuessed(movieId);
   };
 
-
-
   const getMovieByCategory = (assignments: any, category: 'oneWord' | 'dialogue' | 'actOut'): MovieCard | null => {
     if (!assignments) return null;
     return assignments[category] || null;
@@ -86,20 +82,6 @@ export default function MovieRoundGameplay({
     return gameState.roundState?.revealedMovies?.some(movie => 
       movie.movieId === movieId && movie.playerId !== currentRoundPlayer
     ) || false;
-  };
-
-  const areAllOwnMoviesGuessed = () => {
-    // Get all the current player's movies
-    const currentPlayerMovies = [
-      getMovieByCategory(currentRoundPlayerAssignments, 'oneWord'),
-      getMovieByCategory(currentRoundPlayerAssignments, 'dialogue'),
-      getMovieByCategory(currentRoundPlayerAssignments, 'actOut'),
-    ].filter(movie => movie !== null);
-
-    // Check if all of them have been guessed
-    return currentPlayerMovies.every(movie => 
-      movie && isMovieGuessed(movie.id)
-    );
   };
 
   const MovieButton = ({ 
@@ -123,9 +105,8 @@ export default function MovieRoundGameplay({
     const isGuessed = isMovieGuessed(movie.id);
     const isUsedByOther = isMovieUsedByOtherPlayer(movie.id);
     
-    // For opponent's movies, check if all own movies are guessed first
-    const canRevealOpponentMovie = isCurrentPlayerTeam || areAllOwnMoviesGuessed();
-    const canReveal = isCurrentPlayerTurn && !isRevealed && !isUsedByOther && canRevealOpponentMovie;
+    // Players can only reveal their own movies
+    const canReveal = isCurrentPlayerTurn && !isRevealed && !isUsedByOther && isCurrentPlayerTeam;
     const canInteract = isCurrentPlayerTurn && isRevealed && !isGuessed;
 
     return (
@@ -173,8 +154,8 @@ export default function MovieRoundGameplay({
                 ? 'Click to reveal' 
                 : isUsedByOther 
                 ? 'Used by opponent'
-                : !isCurrentPlayerTeam && !areAllOwnMoviesGuessed()
-                ? 'Guess all your movies first'
+                : !isCurrentPlayerTeam
+                ? 'Opponent\'s movie'
                 : 'Waiting...'}
             </div>
           )}
@@ -234,20 +215,10 @@ export default function MovieRoundGameplay({
       <div className="text-center mb-6">
         <p className="text-gray-600 dark:text-gray-400">
           {isCurrentPlayerTurn 
-            ? "Click buttons to reveal movies and give clues to your team! You must guess all your own movies before attempting opponent's movies."
+            ? "Click buttons to reveal your movies and give clues to your team! You can only reveal your own movies."
             : `Watch ${getCurrentPlayerName()} play. Movies they use will be unavailable for your turn.`
           }
         </p>
-        {isCurrentPlayerTurn && !areAllOwnMoviesGuessed() && (
-          <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
-            💡 Focus on your own movies first - opponent's movies are locked until you guess all yours!
-          </p>
-        )}
-        {isCurrentPlayerTurn && areAllOwnMoviesGuessed() && (
-          <p className="text-sm text-green-600 dark:text-green-400 mt-2">
-            🎉 All your movies guessed! You can now attempt opponent's movies for bonus points.
-          </p>
-        )}
       </div>
 
       {/* 3x2 Movie Grid */}
@@ -261,7 +232,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(currentRoundPlayerAssignments, 'oneWord')}
               category="oneWord"
-              isCurrentPlayerTeam={true}
+              isCurrentPlayerTeam={currentRoundPlayer === currentPlayer.id}
               categoryLabel="One Word"
               icon="🎯"
               color="bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600"
@@ -269,7 +240,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(currentRoundPlayerAssignments, 'dialogue')}
               category="dialogue"
-              isCurrentPlayerTeam={true}
+              isCurrentPlayerTeam={currentRoundPlayer === currentPlayer.id}
               categoryLabel="Dialogue"
               icon="💬"
               color="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-600"
@@ -277,7 +248,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(currentRoundPlayerAssignments, 'actOut')}
               category="actOut"
-              isCurrentPlayerTeam={true}
+              isCurrentPlayerTeam={currentRoundPlayer === currentPlayer.id}
               categoryLabel="Act It Out"
               icon="🎭"
               color="bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-600"
@@ -294,7 +265,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(otherPlayerAssignments, 'oneWord')}
               category="oneWord"
-              isCurrentPlayerTeam={false}
+              isCurrentPlayerTeam={otherPlayerId === currentPlayer.id}
               categoryLabel="One Word"
               icon="🎯"
               color="bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-600"
@@ -302,7 +273,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(otherPlayerAssignments, 'dialogue')}
               category="dialogue"
-              isCurrentPlayerTeam={false}
+              isCurrentPlayerTeam={otherPlayerId === currentPlayer.id}
               categoryLabel="Dialogue"
               icon="💬"
               color="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-600"
@@ -310,7 +281,7 @@ export default function MovieRoundGameplay({
             <MovieButton
               movie={getMovieByCategory(otherPlayerAssignments, 'actOut')}
               category="actOut"
-              isCurrentPlayerTeam={false}
+              isCurrentPlayerTeam={otherPlayerId === currentPlayer.id}
               categoryLabel="Act It Out"
               icon="🎭"
               color="bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-600"

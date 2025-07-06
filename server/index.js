@@ -234,7 +234,7 @@ function startHeadToHeadCountdown(gameId) {
   if (!game) return;
   
   game.headToHead.countdownActive = true;
-  game.headToHead.countdownTime = 3;
+  game.headToHead.countdownTime = 4;
   game.headToHead.isReady = true; // Hide ready button during countdown
   
   const countdown = setInterval(() => {
@@ -358,17 +358,11 @@ function switchMovieRoundPlayer(gameId) {
   const currentPlayerIndex = game.roundState.currentPlayerIndex;
   const nextPlayerIndex = (currentPlayerIndex + 1) % game.roundState.playersOrder.length;
 
-  // If we've completed a full cycle, check if round should end
+  // If we've completed a full cycle (both players have had their turn once), end the round
   if (nextPlayerIndex === 0) {
-    // Check if all movies have been revealed/guessed or if we should continue
-    const totalMovies = Object.keys(game.currentPlayerAssignments).length * 3; // 3 categories per player
-    const totalGuessed = game.roundState.guessedMovies.length;
-    
-    if (totalGuessed >= totalMovies) {
-      // Round complete - move to next head-to-head or end game
-      endMovieRound(gameId);
-      return;
-    }
+    // Round complete - move to next head-to-head or end game
+    endMovieRound(gameId);
+    return;
   }
 
   // Switch to next player
