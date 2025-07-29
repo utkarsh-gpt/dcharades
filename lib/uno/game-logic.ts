@@ -153,13 +153,23 @@ export class UnoGameLogic {
         break;
 
       case 'peek-pick':
-        // Look at opponent's hand and force discard
-        // This requires additional client interaction
-        gameState.specialEffectActive = {
-          type: 'peek-pick',
-          playerId: playerId,
-          timeRemaining: 30, // 30 seconds to choose
-        };
+        // Reveal one random opponent card and allow color change
+        if (opponent.hand.length > 0) {
+          const randomIndex = Math.floor(Math.random() * opponent.hand.length);
+          const revealedCard = opponent.hand[randomIndex];
+          // Store the revealed card info for client display
+          gameState.specialEffectActive = {
+            type: 'peek-pick',
+            playerId: playerId,
+            timeRemaining: 3, // Brief display of revealed card
+            revealedCard: revealedCard
+          };
+        }
+        // Allow color change like a wild card
+        if (additionalData?.chosenColor) {
+          gameState.currentColor = additionalData.chosenColor;
+        }
+        this.advanceTurn(gameState);
         break;
 
       case 'double-down':
@@ -187,30 +197,16 @@ export class UnoGameLogic {
         break;
 
       case 'shield':
-        // Activate shield for next action card
+        // Activate shield for next action card and allow color change
         currentPlayer.shieldActive = true;
+        // Shield can change color like a wild card
+        if (additionalData?.chosenColor) {
+          gameState.currentColor = additionalData.chosenColor;
+        }
         this.advanceTurn(gameState);
         break;
 
-      case 'time-bomb':
-        // Opponent has 10 seconds to play or draws 3
-        gameState.specialEffectActive = {
-          type: 'time-bomb',
-          playerId: opponent.id,
-          timeRemaining: 10,
-        };
-        break;
 
-      case 'lucky-draw':
-        // Draw 3 cards, keep 1, opponent gets other 2
-        const drawnCards = this.drawCards(gameState, currentPlayer, 3);
-        // This requires client interaction to choose which card to keep
-        gameState.specialEffectActive = {
-          type: 'lucky-draw',
-          playerId: playerId,
-          timeRemaining: 20,
-        };
-        break;
 
       case 'final-stand':
         // Opponent draws cards equal to current player's hand size

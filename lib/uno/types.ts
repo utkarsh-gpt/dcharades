@@ -11,8 +11,6 @@ export type UniqueCardType =
   | 'double-down' 
   | 'revenge' 
   | 'shield' 
-  | 'time-bomb' 
-  | 'lucky-draw' 
   | 'final-stand';
 
 export interface UnoCard {
@@ -63,6 +61,7 @@ export interface UnoGameState {
     type: UniqueCardType | null;
     playerId: string | null;
     timeRemaining: number;
+    revealedCard?: UnoCard; // For peek-pick card
   };
   gameHistory: UnoGameRound[];
 }
@@ -92,6 +91,7 @@ export interface UnoGameStateClient {
     type: UniqueCardType | null;
     playerId: string | null;
     timeRemaining: number;
+    revealedCard?: UnoCard; // For peek-pick card
   };
   winner: UnoPlayer | null;
   roundWinner: UnoPlayer | null;
@@ -135,7 +135,6 @@ export interface PlayCardRequest {
   playerId: string;
   cardId: string;
   chosenColor?: UnoColor; // For wild cards
-  targetPlayerId?: string; // For peek-pick card
   additionalCards?: string[]; // For double-down card
 }
 

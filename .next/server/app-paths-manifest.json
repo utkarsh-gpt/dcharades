@@ -1,1 +1,4 @@
-{}
+{
+  "/api/search/actors/route": "app/api/search/actors/route.js",
+  "/filmi-rishta-game/[gameId]/page": "app/filmi-rishta-game/[gameId]/page.js"
+}

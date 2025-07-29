@@ -38,6 +38,10 @@ export default function UnoCard({
         default: return 'bg-gray-500';
       }
     }
+    // Shield and peek-pick cards should be black
+    if (card.type === 'unique' && (card.uniqueType === 'shield' || card.uniqueType === 'peek-pick')) {
+      return 'bg-gray-800';
+    }
     return card.type === 'unique' ? 'bg-purple-500' : 'bg-gray-800';
   };
 
@@ -88,7 +92,11 @@ export default function UnoCard({
 
       {/* Special effects for unique cards */}
       {card.type === 'unique' && (
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-pink-600/20 rounded-lg"></div>
+        <div className={`absolute inset-0 rounded-lg ${
+          (card.uniqueType === 'shield' || card.uniqueType === 'peek-pick')
+            ? 'bg-gradient-to-r from-gray-600/20 to-gray-800/20' 
+            : 'bg-gradient-to-r from-purple-600/20 to-pink-600/20'
+        }`}></div>
       )}
 
 

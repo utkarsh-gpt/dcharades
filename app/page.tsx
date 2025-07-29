@@ -105,6 +105,18 @@ export default function HomePage() {
       route: '/riddles',
       isAvailable: false,
     },
+    {
+      id: 'filmi-rishta',
+      title: 'Filmi Rishta',
+      description: 'Connect Bollywood celebrities through their movies and collaborations! Create chains of connections to link any two stars.',
+      emoji: '🎬',
+      players: '1-2 Players',
+      duration: '5-15 min',
+      difficulty: 'Medium',
+      category: 'Connection',
+      route: '/filmi-rishta',
+      isAvailable: true,
+    },
   ];
 
   const categories = ['All', ...Array.from(new Set(games.map(game => game.category)))];

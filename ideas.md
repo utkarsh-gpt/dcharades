@@ -25,7 +25,7 @@ Unique 2-Player Cards:
 5. **Double Down** - Play two cards of the same number/color simultaneously, opponent draws 4 cards.
 6. **Revenge Card** - Can only be played after opponent uses an action card against you. Doubles the effect back to them.
 7. **Shield Card** - Blocks the next action card played against you and reflects it back to opponent.
-8. **Time Bomb** - Opponent must play a card within 10 seconds or draw 3 cards.
+<!-- 8. **Time Bomb** - Opponent must play a card within 10 seconds or draw 3 cards. -->
 <!-- 9. **Lucky Draw** - Draw 3 cards, keep one, opponent draws the other 2. -->
 10. **Final Stand** - Can only be played when you have 3 or fewer cards. Opponent draws cards equal to your hand size.
 
@@ -117,6 +117,9 @@ Technical Requirements:
 8. The app should handle turn-based gameplay mechanics and player rotation within teams.
 
 
+end game button
+scoreboard with genre counting.
+
 ##3. Classic Dumb Charades
 
 **Classic Dumb Charades**
@@ -174,18 +177,20 @@ Game Requirements:
 A connection-based game where players link Bollywood celebrities, movies, and industry relationships. Players compete to create the longest chains of connections within time limits.
 
 Game Flow:
-1. Players start with a random celebrity name and must create connection chains.
-2. Valid connections include: co-starred in movies, family relationships, director-actor collaborations, or production house associations.
-3. "Six Degrees" challenge to connect two seemingly unrelated celebrities.
-4. "Family Tree" rounds focusing on Bollywood dynasties and relationships.
-5. Bonus points for lesser-known but valid connections.
+1. Players start with a random celebrity name and must create connection chains to reach another given random celebrity name.
+2. Valid connections include: co-starred in movies, director-actor collaborations, or production house associations. Essentially, check if two connections are cast in a movie.
+3. The connection tree must go from celebrity to movie to celebrity to movie and so on.
+4. A check for if the picked movie has the celebrity in it will be made and a check of a picked celebrity is in the movie will be made.
+5. Player can go on until they reach the final celebrity name.
+6. High-scores would be displayed at the end of the game.
+"Six Degrees" challenge to connect two seemingly unrelated celebrities.
 
 Game Requirements:
-1. Comprehensive database of Bollywood relationships and collaborations.
+1. Comprehensive database of Bollywood relationships and collaborations using the https://imdbapi.dev/ api.
 2. Real-time validation of connection claims with supporting evidence.
 3. Visual network display showing connection chains.
-4. Timer-based rounds with increasing complexity.
-5. Hint system for stuck players with point penalties.
+4. Hint system for stuck players with point penalties.
 
+<!-- 4. "Family Tree" rounds focusing on Bollywood dynasties and relationships. -->
 
 ## 6. 1 second movie guess Bollywood.

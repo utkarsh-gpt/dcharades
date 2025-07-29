@@ -7,6 +7,11 @@ const {
   initializeDatabase,
   getRandomMovies,
   getRandomHeadToHeadCard: getRandomHeadToHeadCardFromDB,
+  // Filmi Rishta functions
+  getRandomActors,
+  getMovieById,
+  getActorById,
+  searchMoviesByActor,
 } = require('./db');
 
 const server = createServer();
@@ -84,7 +89,7 @@ function generateUnoDeck(includeUniqueCards = true) {
 
   // Unique cards for 2-player gameplay
   if (includeUniqueCards) {
-    const uniqueTypes = ['duel', 'mirror', 'swap-hands', 'peek-pick', 'double-down', 'revenge', 'shield', 'time-bomb', 'lucky-draw', 'final-stand'];
+    const uniqueTypes = ['duel', 'mirror', 'swap-hands', 'peek-pick', 'double-down', 'revenge', 'shield', 'final-stand'];
     uniqueTypes.forEach(uniqueType => {
       deck.push(createUnoCard('unique', null, null, uniqueType));
       deck.push(createUnoCard('unique', null, null, uniqueType));
@@ -118,6 +123,172 @@ async function getRandomMovieCards() {
     return [];
   }
 }
+
+// Filmi Rishta Game Logic (JavaScript version)
+const FilmiRishtaGameLogic = {
+  // Helper method to get movie details from TMDb
+  async getMovieDetailsFromTMDb(movieId) {
+    try {
+      const TMB_READ_ONLY = process.env.TMB_READ_ONLY;
+      if (!TMB_READ_ONLY) {
+        throw new Error('TMB_READ_ONLY environment variable is not set');
+      }
+      
+      const response = await fetch(`https://api.themoviedb.org/3/movie/${movieId}?language=en-US`, {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          Authorization: `Bearer ${TMB_READ_ONLY}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`TMDb API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting movie details:', error);
+      return null;
+    }
+  },
+
+  // Helper method to get person details from TMDb
+  async getPersonDetailsFromTMDb(personId) {
+    try {
+      const TMB_READ_ONLY = process.env.TMB_READ_ONLY;
+      if (!TMB_READ_ONLY) {
+        throw new Error('TMB_READ_ONLY environment variable is not set');
+      }
+      
+      const response = await fetch(`https://api.themoviedb.org/3/person/${personId}?language=en-US`, {
+        method: 'GET',
+        headers: {
+          accept: 'application/json',
+          Authorization: `Bearer ${TMB_READ_ONLY}`
+        }
+      });
+
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`TMDb API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting person details:', error);
+      return null;
+    }
+  },
+
+  // Generate a new challenge
+  async generateChallenge(difficulty = 'medium') {
+    try {
+      // Get two random actors for the challenge
+      const [startActor, endActor] = await getRandomActors(2);
+      
+      if (!startActor || !endActor) {
+        throw new Error('Unable to generate challenge - no actors available');
+      }
+
+      return {
+        id: uuidv4(),
+        startCelebrity: {
+          id: startActor.crew_id,
+          name: startActor.name,
+          isActive: true,
+        },
+        endCelebrity: {
+          id: endActor.crew_id,
+          name: endActor.name,
+          isActive: true,
+        },
+        difficulty,
+        maxSteps: difficulty === 'easy' ? 4 : difficulty === 'medium' ? 3 : 2,
+        timeLimit: 300, // 5 minutes
+        createdAt: Date.now(),
+      };
+    } catch (error) {
+      console.error('Error generating challenge:', error);
+      throw error;
+    }
+  },
+
+  // Start a new challenge
+  startChallenge(gameState, challenge, playerId) {
+    const player = gameState.players.find(p => p.id === playerId);
+    if (!player) throw new Error('Player not found');
+
+    const newPath = {
+      connections: [],
+      totalSteps: 0,
+      startCelebrity: challenge.startCelebrity,
+      endCelebrity: challenge.endCelebrity,
+      currentCelebrity: challenge.startCelebrity,
+      isComplete: false,
+    };
+
+    return {
+      ...gameState,
+      currentChallenge: challenge,
+      currentPlayerId: playerId,
+      currentPhase: 'playing',
+      timeRemaining: gameState.settings.timeLimit,
+      isActive: true,
+      players: gameState.players.map(p => 
+        p.id === playerId 
+          ? { ...p, currentPath: newPath, isActive: true, timeRemaining: gameState.settings.timeLimit }
+          : { ...p, isActive: false }
+      ),
+    };
+  },
+
+
+
+  // Use a hint
+  async useHint(gameState, playerId, hintType) {
+    const player = gameState.players.find(p => p.id === playerId);
+    if (!player || !player.currentPath) throw new Error('Player or path not found');
+
+    try {
+      let hint = {
+        type: hintType,
+        content: '',
+      };
+
+      if (hintType === 'movies') {
+        // Get movies featuring the current celebrity
+        const movies = await searchMoviesByActor(player.currentPath.currentCelebrity.id);
+        const movieTitles = movies.slice(0, 3).map(m => m.title);
+        hint.content = `Movies featuring ${player.currentPath.currentCelebrity.name}: ${movieTitles.join(', ')}`;
+      } else if (hintType === 'shortest-path') {
+        hint.content = `Try to connect through popular movies or well-known collaborations.`;
+      } else if (hintType === 'common-movies') {
+        hint.content = `Look for movies where both actors might have worked together or with common co-stars.`;
+      }
+
+      // Update player's hint count
+      const updatedPlayers = gameState.players.map(p =>
+        p.id === playerId
+          ? { ...p, hintsUsed: (p.hintsUsed || 0) + 1 }
+          : p
+      );
+
+      return {
+        gameState: {
+          ...gameState,
+          players: updatedPlayers,
+        },
+        hint,
+      };
+
+    } catch (error) {
+      console.error('Error using hint:', error);
+      throw error;
+    }
+  },
+};
 
 async function getRandomHeadToHeadCard() {
   try {
@@ -449,6 +620,35 @@ function getGameStateForClient(game) {
   return clientGame;
 }
 
+// Filmi Rishta Game Helper Functions
+function getFilmiRishtaGameStateForClient(game) {
+  // Return a clean version of the game state for the client
+  return {
+    id: game.id,
+    players: game.players.map(player => ({
+      id: player.id,
+      name: player.name,
+      score: player.score,
+      currentPath: player.currentPath,
+      isReady: player.isReady,
+      timeRemaining: player.timeRemaining,
+      hintsUsed: player.hintsUsed,
+      isActive: player.isActive,
+      isHost: player.isHost || false,
+    })),
+    settings: game.settings,
+    currentPhase: game.currentPhase,
+    currentChallenge: game.currentChallenge,
+    currentPlayerId: game.currentPlayerId,
+    timeRemaining: game.timeRemaining,
+    isActive: game.isActive,
+    isGameStarted: game.isGameStarted,
+    winner: game.winner,
+    leaderboard: game.leaderboard,
+    gameHistory: game.gameHistory,
+  };
+}
+
 // UNO Game Management Functions
 function createUnoGame(gameId, hostPlayer, settings = DEFAULT_UNO_SETTINGS) {
   const deck = generateUnoDeck(settings.includeUniqueCards);
@@ -614,7 +814,7 @@ function advanceUnoTurn(game) {
     
     // Check if current player can stack draw cards
     const canStack = topCard && (topCard.type === 'draw-two' || topCard.type === 'wild-draw-four') &&
-                     currentPlayer.hand.some(card => card.type === 'draw-two' || card.type === 'wild-draw-four');
+                     currentPlayer.hand.some(card => card.type === 'draw-two' || card.type === 'wild-draw-four' || card.type === 'unique' || card.type === 'revenge');
     
     if (!canStack) {
       // Check if player has shield active
@@ -723,12 +923,24 @@ function applyUniqueCardEffect(game, card, playerId, additionalData) {
       break;
 
     case 'peek-pick':
-      game.specialEffectActive = {
-        type: 'peek-pick',
-        playerId: playerId,
-        timeRemaining: 30,
-      };
-      startSpecialEffectTimer(game.id);
+      // Reveal one random opponent card and allow color change
+      if (opponent.hand.length > 0) {
+        const randomIndex = Math.floor(Math.random() * opponent.hand.length);
+        const revealedCard = opponent.hand[randomIndex];
+        // Store the revealed card info for client display
+        game.specialEffectActive = {
+          type: 'peek-pick',
+          playerId: playerId,
+          timeRemaining: 3, // Brief display of revealed card
+          revealedCard: revealedCard
+        };
+        startSpecialEffectTimer(game.id);
+      }
+      // Allow color change like a wild card
+      if (additionalData.chosenColor) {
+        game.currentColor = additionalData.chosenColor;
+      }
+      advanceUnoTurn(game);
       break;
 
     case 'double-down':
@@ -752,23 +964,14 @@ function applyUniqueCardEffect(game, card, playerId, additionalData) {
 
     case 'shield':
       currentPlayer.shieldActive = true;
+      // Shield can change color like a wild card
+      if (additionalData.chosenColor) {
+        game.currentColor = additionalData.chosenColor;
+      }
       advanceUnoTurn(game);
       break;
 
-    case 'time-bomb':
-      game.specialEffectActive = {
-        type: 'time-bomb',
-        playerId: opponent.id,
-        timeRemaining: 10,
-      };
-      startSpecialEffectTimer(game.id);
-      break;
 
-    case 'lucky-draw':
-      const luckyCards = drawUnoCards(game, currentPlayer, 3);
-      // Player can play immediately if they have a valid card
-      advanceUnoTurn(game);
-      break;
 
     case 'final-stand':
       if (currentPlayer.hand.length <= 3) {
@@ -887,8 +1090,14 @@ function startUnoTurnTimer(gameId) {
       }
     }
 
-    // Emit game state update
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    // Emit game state update with individual player hands
+    game.players.forEach(gamePlayer => {
+      const gameStateForPlayer = {
+        ...getUnoGameStateForClient(game),
+        playerHand: gamePlayer.hand || [],
+      };
+      io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+    });
   }, 1000);
 }
 
@@ -905,26 +1114,28 @@ function startSpecialEffectTimer(gameId) {
 
     if (game.specialEffectActive.timeRemaining <= 0) {
       // Handle timeout
-      if (game.specialEffectActive.type === 'time-bomb') {
-        const targetPlayer = game.players.find(p => p.id === game.specialEffectActive.playerId);
-        if (targetPlayer) {
-          drawUnoCards(game, targetPlayer, 3);
-        }
-      }
+      // No special timeout handling needed since time-bomb and lucky-draw are removed
 
       // Clear special effect
       game.specialEffectActive = {
         type: null,
         playerId: null,
         timeRemaining: 0,
+        revealedCard: undefined,
       };
 
       clearInterval(game.specialEffectTimer);
       game.specialEffectTimer = null;
     }
 
-    // Emit game state update
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+    // Emit game state update with individual player hands
+    game.players.forEach(gamePlayer => {
+      const gameStateForPlayer = {
+        ...getUnoGameStateForClient(game),
+        playerHand: gamePlayer.hand || [],
+      };
+      io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+    });
   }, 1000);
 }
 
@@ -960,6 +1171,424 @@ function getUnoGameStateForClient(game) {
 // Socket event handlers
 io.on('connection', (socket) => {
 
+  // Filmi Rishta Game Handlers
+  socket.on('create-filmi-rishta-game', async ({ gameId, playerName, gameMode }) => {
+    try {
+      // Check if game already exists
+      const existingGame = games.get(gameId);
+      if (existingGame) {
+        // If it's the same player trying to recreate, allow rejoining
+        const existingHost = existingGame.players.find(p => p.isHost);
+        if (existingHost && existingHost.id === socket.id) {
+          socket.join(gameId);
+          socket.emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(existingGame));
+          return;
+        } else {
+          socket.emit('error', `Game ID "${gameId}" already exists. Please choose a different game ID.`);
+          return;
+        }
+      }
+      
+      const hostPlayer = {
+        id: socket.id,
+        name: playerName,
+        score: 0,
+        currentPath: null,
+        isReady: true, // Auto-ready the host
+        timeRemaining: 300,
+        hintsUsed: 0,
+        isActive: false,
+        isHost: true,
+      };
+      
+      // Create Filmi Rishta game state
+      const filmiRishtaGame = {
+        id: gameId,
+        players: [hostPlayer],
+        settings: {
+          gameMode: gameMode || 'solo',
+          timeLimit: 300, // 5 minutes
+          maxHints: 3,
+          difficulty: 'medium',
+          enableSkip: false,
+          pointsPerConnection: 10,
+          hintPenalty: 5,
+          timeBonusMultiplier: 1.5,
+        },
+        currentPhase: 'lobby',
+        currentChallenge: null,
+        currentPlayerId: null,
+        timeRemaining: 300,
+        isActive: false,
+        isGameStarted: false,
+        winner: null,
+        leaderboard: [],
+        gameHistory: [],
+        createdAt: Date.now(), // Add timestamp for cleanup
+      };
+      
+      games.set(gameId, filmiRishtaGame);
+      playerSockets.set(socket.id, { gameId, playerId: socket.id });
+      
+      socket.join(gameId);
+      socket.emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(filmiRishtaGame));
+      
+    } catch (error) {
+      console.error('Error creating Filmi Rishta game:', error);
+      socket.emit('error', 'Failed to create game');
+    }
+  });
+
+  socket.on('join-filmi-rishta-game', ({ gameId, playerName }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', `Game "${gameId}" not found`);
+        return;
+      }
+
+      if (game.settings.gameMode === 'solo' && game.players.length >= 1) {
+        socket.emit('error', 'This is a solo game and already has a player');
+        return;
+      }
+
+      if (game.settings.gameMode === 'versus' && game.players.length >= 2) {
+        socket.emit('error', 'Game is full (maximum 2 players for versus mode)');
+        return;
+      }
+
+      // Check if player already exists
+      const existingPlayer = game.players.find(p => p.id === socket.id);
+      if (existingPlayer) {
+        socket.join(gameId);
+        socket.emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+        return;
+      }
+
+      const newPlayer = {
+        id: socket.id,
+        name: playerName,
+        score: 0,
+        currentPath: null,
+        isReady: false,
+        timeRemaining: game.settings.timeLimit,
+        hintsUsed: 0,
+        isActive: false,
+        isHost: false,
+      };
+
+      game.players.push(newPlayer);
+      playerSockets.set(socket.id, { gameId, playerId: socket.id });
+
+      socket.join(gameId);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+      io.to(gameId).emit('player-joined', newPlayer);
+
+    } catch (error) {
+      console.error('Error joining Filmi Rishta game:', error);
+      socket.emit('error', 'Failed to join game');
+    }
+  });
+
+  socket.on('start-filmi-rishta-game', async ({ gameId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      // Check if all players are ready
+      const allReady = game.players.every(p => p.isReady);
+      if (!allReady) {
+        socket.emit('error', 'Not all players are ready');
+        return;
+      }
+
+      // Generate first challenge
+      const challenge = await FilmiRishtaGameLogic.generateChallenge(game.settings.difficulty);
+      
+      // Start the game for the first player (or all players in solo mode)
+      const firstPlayer = game.players[0];
+      const updatedGame = FilmiRishtaGameLogic.startChallenge(game, challenge, firstPlayer.id);
+      
+      games.set(gameId, updatedGame);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(updatedGame));
+      io.to(gameId).emit('challenge-started', challenge);
+
+    } catch (error) {
+      console.error('Error starting Filmi Rishta game:', error);
+      socket.emit('error', 'Failed to start game: ' + error.message);
+    }
+  });
+
+
+
+  socket.on('request-hint', async ({ gameId, playerId, hintType }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const { gameState: updatedGame, hint } = await FilmiRishtaGameLogic.useHint(
+        game, 
+        playerId, 
+        hintType
+      );
+      
+      games.set(gameId, updatedGame);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(updatedGame));
+      socket.emit('hint-received', hint);
+
+    } catch (error) {
+      console.error('Error requesting hint:', error);
+      socket.emit('error', error.message);
+    }
+  });
+
+  socket.on('new-challenge', async ({ gameId, playerId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      // Generate new challenge
+      const challenge = await FilmiRishtaGameLogic.generateChallenge(game.settings.difficulty);
+      
+      // Start new challenge
+      const updatedGame = FilmiRishtaGameLogic.startChallenge(game, challenge, playerId);
+      
+      games.set(gameId, updatedGame);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(updatedGame));
+      io.to(gameId).emit('challenge-started', challenge);
+
+    } catch (error) {
+      console.error('Error creating new challenge:', error);
+      socket.emit('error', 'Failed to create new challenge: ' + error.message);
+    }
+  });
+
+  socket.on('leave-filmi-rishta-game', ({ gameId, playerId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) return;
+
+      // Remove player from game
+      game.players = game.players.filter(p => p.id !== playerId);
+      
+      // Clean up player socket mapping
+      playerSockets.delete(socket.id);
+      socket.leave(gameId);
+
+      if (game.players.length === 0) {
+        // Delete empty game
+        games.delete(gameId);
+      } else {
+        // Update remaining players
+        games.set(gameId, game);
+        io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+        io.to(gameId).emit('player-left', playerId);
+      }
+
+    } catch (error) {
+      console.error('Error leaving Filmi Rishta game:', error);
+    }
+  });
+
+  socket.on('update-filmi-rishta-settings', ({ gameId, settings }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      // Only host can update settings
+      const player = game.players.find(p => p.id === socket.id);
+      if (!player || !player.isHost) {
+        socket.emit('error', 'Only the host can update settings');
+        return;
+      }
+
+      // Update settings
+      game.settings = { ...game.settings, ...settings };
+      
+      games.set(gameId, game);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+
+    } catch (error) {
+      console.error('Error updating Filmi Rishta settings:', error);
+      socket.emit('error', 'Failed to update settings');
+    }
+  });
+
+  socket.on('movie-validated', async ({ gameId, playerId, movie }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player || !player.currentPath) {
+        socket.emit('error', 'Player or path not found');
+        return;
+      }
+
+      // Store the validated movie for the next step
+      game.currentSelectedMovie = movie;
+      
+      games.set(gameId, game);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+      io.to(gameId).emit('movie-validated', { playerId, movie });
+
+    } catch (error) {
+      console.error('Error handling movie validation:', error);
+      socket.emit('error', 'Failed to validate movie');
+    }
+  });
+
+  socket.on('celebrity-validated', async ({ gameId, playerId, celebrity }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player || !player.currentPath) {
+        socket.emit('error', 'Player or path not found');
+        return;
+      }
+
+      // Get the previously validated movie
+      const movie = game.currentSelectedMovie;
+      if (!movie) {
+        socket.emit('error', 'No movie selected for this connection');
+        return;
+      }
+
+      // Add the connection to the path
+      const connection = {
+        from: player.currentPath.currentCelebrity,
+        to: celebrity,
+        via: movie,
+        type: 'co-starred',
+      };
+
+      // Update the player's path
+      player.currentPath.connections.push(connection);
+      player.currentPath.totalSteps += 1;
+      player.currentPath.currentCelebrity = celebrity;
+      player.currentPath.isComplete = celebrity.id === player.currentPath.endCelebrity.id;
+
+      // Clear the selected movie
+      game.currentSelectedMovie = null;
+
+      // Check if the challenge is complete
+      if (player.currentPath.isComplete) {
+        game.currentPhase = 'completed';
+        game.isActive = false;
+        
+        // Calculate score
+        const baseScore = 1000;
+        const stepPenalty = player.currentPath.totalSteps * 50;
+        const timePenalty = Math.max(0, (game.settings.timeLimit - player.timeRemaining) * 2);
+        player.score = Math.max(100, baseScore - stepPenalty - timePenalty);
+        
+        io.to(gameId).emit('challenge-completed', {
+          playerId: player.id,
+          playerName: player.name,
+          score: player.score,
+          path: player.currentPath
+        });
+      }
+      
+      games.set(gameId, game);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+      io.to(gameId).emit('celebrity-validated', { playerId, celebrity });
+
+    } catch (error) {
+      console.error('Error handling celebrity validation:', error);
+      socket.emit('error', 'Failed to validate celebrity');
+    }
+  });
+
+  socket.on('request-hint', async ({ gameId, playerId, hintType }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) {
+        socket.emit('error', 'Player not found');
+        return;
+      }
+
+      // Check if player has hints remaining
+      if (player.hintsUsed >= game.settings.maxHints) {
+        socket.emit('error', 'No hints remaining');
+        return;
+      }
+
+      // Increment hints used
+      player.hintsUsed += 1;
+
+      // Generate hint (placeholder for now)
+      const hint = {
+        type: hintType,
+        hint: `Hint for ${hintType}`,
+        cost: game.settings.hintPenalty
+      };
+
+      games.set(gameId, game);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+      io.to(playerId).emit('hint-received', hint);
+
+    } catch (error) {
+      console.error('Error handling hint request:', error);
+      socket.emit('error', 'Failed to provide hint');
+    }
+  });
+
+  socket.on('skip-challenge', ({ gameId, playerId }) => {
+    try {
+      const game = games.get(gameId);
+      if (!game) {
+        socket.emit('error', 'Game not found');
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) {
+        socket.emit('error', 'Player not found');
+        return;
+      }
+
+      // Reset the player's path
+      player.currentPath = null;
+      game.currentSelectedMovie = null;
+      game.currentPhase = 'lobby';
+      game.isActive = false;
+      
+      games.set(gameId, game);
+      io.to(gameId).emit('filmi-rishta-game-state', getFilmiRishtaGameStateForClient(game));
+
+    } catch (error) {
+      console.error('Error handling challenge skip:', error);
+      socket.emit('error', 'Failed to skip challenge');
+    }
+  });
+
   // Blockbuster Game Handlers
   socket.on('create-blockbuster-game', ({ gameId, playerName, settings }) => {
     try {
@@ -990,6 +1619,7 @@ io.on('connection', (socket) => {
       // Create Blockbuster game state
       const blockbusterGame = createGame(gameId, hostPlayer);
       blockbusterGame.settings = { ...blockbusterGame.settings, ...settings };
+      blockbusterGame.createdAt = Date.now(); // Add timestamp for cleanup
       
       games.set(gameId, blockbusterGame);
       playerSockets.set(socket.id, { gameId, playerId: socket.id });
@@ -1483,9 +2113,33 @@ io.on('connection', (socket) => {
   socket.on('create-uno-game', ({ gameId, playerName, settings }) => {
     try {
       // Check if game already exists
-      if (games.has(gameId)) {
-        socket.emit('error', 'Game ID already exists');
-        return;
+      const existingGame = games.get(gameId);
+      if (existingGame) {
+        // If it's the same player trying to recreate, allow rejoining
+        const existingHost = existingGame.players.find(p => p.isHost);
+        if (existingHost && existingHost.id === socket.id) {
+          socket.join(gameId);
+          const gameStateForPlayer = {
+            ...getUnoGameStateForClient(existingGame),
+            playerHand: existingHost.hand || [],
+          };
+          socket.emit('unoGameState', gameStateForPlayer);
+          return;
+        } else {
+          // Check if game is stale (no active players)
+          const connectedSockets = io.sockets.adapter.rooms.get(gameId);
+          const hasActivePlayers = existingGame.players.some(p => 
+            connectedSockets && connectedSockets.has(p.id)
+          );
+          
+          if (!hasActivePlayers) {
+            // Game is stale, delete it and create new one
+            games.delete(gameId);
+          } else {
+            socket.emit('error', `Game ID "${gameId}" already exists. Please choose a different game ID.`);
+            return;
+          }
+        }
       }
 
       // Create new UNO game
@@ -1497,11 +2151,14 @@ io.on('connection', (socket) => {
       };
       
       const game = createUnoGame(gameId, hostPlayer, settings);
+      game.createdAt = Date.now(); // Add timestamp for cleanup
       games.set(gameId, game);
       
       // Join socket room
       socket.join(gameId);
       playerSockets.set(socket.id, { gameId, playerName });
+      
+      console.log(`UNO game created: ${gameId} by ${playerName}`);
       
       // Emit game state with individual hands
       const gameStateForPlayer = {
@@ -1609,8 +2266,14 @@ io.on('connection', (socket) => {
       // Toggle ready status
     player.isReady = !player.isReady;
       
-      // Emit updated game state
-    io.to(gameId).emit('unoGameState', getUnoGameStateForClient(game));
+      // Emit updated game state with individual hands
+    game.players.forEach(gamePlayer => {
+      const gameStateForPlayer = {
+        ...getUnoGameStateForClient(game),
+        playerHand: gamePlayer.hand || [],
+      };
+      io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
+    });
       
     } catch (error) {
       socket.emit('error', 'Failed to update ready status');
@@ -1817,64 +2480,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('peek-pick-card', ({ gameId, targetCardId }) => {
-    try {
-      const game = games.get(gameId);
-      if (!game || game.specialEffectActive.type !== 'peek-pick') {
-        socket.emit('error', 'Peek-pick not active');
-        return;
-      }
 
-      if (game.specialEffectActive.playerId !== socket.id) {
-        socket.emit('error', 'Not your peek-pick turn');
-        return;
-      }
-      
-      const targetPlayer = game.players.find(p => p.id !== socket.id);
-      const cardToRemove = targetPlayer.hand.find(c => c.id === targetCardId);
-      
-      if (cardToRemove) {
-        // Remove card from opponent's hand
-        targetPlayer.hand = targetPlayer.hand.filter(c => c.id !== targetCardId);
-        
-        // Add to discard pile
-        game.discardPile.unshift(cardToRemove);
-        game.currentColor = cardToRemove.color || game.currentColor;
-      }
-      
-      // Clear special effect
-      game.specialEffectActive = {
-        type: null,
-        playerId: null,
-        timeRemaining: 0,
-      };
-      
-      if (game.specialEffectTimer) {
-        clearInterval(game.specialEffectTimer);
-        game.specialEffectTimer = null;
-      }
-      
-      // Advance turn
-        advanceUnoTurn(game);
-      
-      // Start turn timer
-      if (game.isActive && game.currentPhase === 'playing' && game.settings.timePerTurn > 0) {
-          startUnoTurnTimer(gameId);
-      }
-      
-      // Emit updated game state
-      game.players.forEach(gamePlayer => {
-        const gameStateForPlayer = {
-          ...getUnoGameStateForClient(game),
-          playerHand: gamePlayer.hand || [],
-        };
-        io.to(gamePlayer.id).emit('unoGameState', gameStateForPlayer);
-      });
-      
-    } catch (error) {
-      socket.emit('error', 'Failed to handle peek-pick');
-    }
-  });
 
   socket.on('next-uno-round', ({ gameId }) => {
     try {
@@ -2072,6 +2678,58 @@ function handlePlayerLeave(socketId, gameId) {
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 
+// Clean up stale games periodically
+function cleanupStaleGames() {
+  const staleCutoff = Date.now() - (30 * 60 * 1000); // 30 minutes
+  let cleanedCount = 0;
+  
+  games.forEach((game, gameId) => {
+    const connectedSockets = io.sockets.adapter.rooms.get(gameId);
+    const hasActivePlayers = game.players && game.players.some(p => 
+      connectedSockets && connectedSockets.has(p.id)
+    );
+    
+    // If no active players or game is very old, clean it up
+    if (!hasActivePlayers || (game.createdAt && game.createdAt < staleCutoff)) {
+      console.log(`Cleaning up stale game: ${gameId}`);
+      
+      // Clean up timers
+      if (game.turnTimer) clearInterval(game.turnTimer);
+      if (game.specialEffectTimer) clearInterval(game.specialEffectTimer);
+      if (game.roundTimer) clearInterval(game.roundTimer);
+      if (game.headToHeadTimer) clearInterval(game.headToHeadTimer);
+      if (game.countdownTimer) clearInterval(game.countdownTimer);
+      
+      games.delete(gameId);
+      cleanedCount++;
+    }
+  });
+  
+  if (cleanedCount > 0) {
+    console.log(`Cleaned up ${cleanedCount} stale games. Active games: ${games.size}`);
+  }
+}
+
+// Run cleanup every 5 minutes
+setInterval(cleanupStaleGames, 5 * 60 * 1000);
+
+// Debug function to log active games (for development)
+function logActiveGames() {
+  const gamesList = Array.from(games.entries()).map(([gameId, game]) => ({
+    gameId,
+    playerCount: game.players ? game.players.length : 0,
+    isActive: game.isActive,
+    phase: game.currentPhase,
+    createdAt: game.createdAt ? new Date(game.createdAt).toISOString() : 'unknown',
+    gameType: game.settings?.gameType || 'blockbuster'
+  }));
+  
+  console.log('Active games:', {
+    totalGames: games.size,
+    games: gamesList
+  });
+}
+
 // Initialize database and start server
 async function startServer() {
   try {
@@ -2081,6 +2739,8 @@ async function startServer() {
     // Listen on all interfaces (0.0.0.0) for cloud deployment
     server.listen(PORT, HOST, () => {
       console.log(`Server running on ${HOST}:${PORT}`);
+      console.log('🎮 Game server ready!');
+      console.log('💡 To debug games, check console logs for game creation/cleanup events');
     });
     
   } catch (error) {

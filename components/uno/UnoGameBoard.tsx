@@ -27,6 +27,7 @@ export default function UnoGameBoard({
 }: UnoGameBoardProps) {
   const [selectedCard, setSelectedCard] = useState<UnoCard | null>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showCardInfo, setShowCardInfo] = useState(false);
   const [chatMessage, setChatMessage] = useState('');
   const [showChat, setShowChat] = useState(false);
   const [showBlockButton, setShowBlockButton] = useState(false);
@@ -137,7 +138,8 @@ export default function UnoGameBoard({
     if (!selectedCard || !isCurrentPlayerTurn) return;
 
     // Check if card requires color selection
-    if (selectedCard.type === 'wild' || selectedCard.type === 'wild-draw-four') {
+    if (selectedCard.type === 'wild' || selectedCard.type === 'wild-draw-four' || 
+        (selectedCard.type === 'unique' && (selectedCard.uniqueType === 'shield' || selectedCard.uniqueType === 'peek-pick'))) {
       setShowColorPicker(true);
       return;
     }
@@ -202,6 +204,15 @@ export default function UnoGameBoard({
     };
   };
 
+  const getCardInfo = (card: UnoCard) => {
+    return getCardDisplayInfo(card);
+  };
+
+  const isSpecialCard = (card: UnoCard | null): boolean => {
+    return card?.type === 'unique' || card?.type === 'wild' || card?.type === 'wild-draw-four' || 
+           (card?.type !== 'number' && card?.type !== undefined);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-800 via-slate-700 to-slate-900 relative overflow-hidden">
       {/* Background pattern */}
@@ -243,6 +254,23 @@ export default function UnoGameBoard({
                   </div>
                 </div>
               ))}
+              
+              {/* Revealed Card - Show during peek-pick effect */}
+              {gameState.specialEffectActive.type === 'peek-pick' && gameState.specialEffectActive.revealedCard && (
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-8 z-30">
+                  <div className="bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-xl border-2 border-yellow-400 animate-pulse">
+                    <div className="text-center mb-2">
+                      <h3 className="text-sm font-bold text-gray-800">Card Revealed!</h3>
+                    </div>
+                    <div className="flex justify-center">
+                      <UnoCardComponent 
+                        card={gameState.specialEffectActive.revealedCard} 
+                        size="medium" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -280,6 +308,18 @@ export default function UnoGameBoard({
               <div className="text-white text-xs mt-2 opacity-75">
                 {selectedCard ? 'Tap to play' : 'Play pile'}
               </div>
+              
+              {/* Info Button for Special Cards */}
+              {selectedCard && isSpecialCard(selectedCard) && (
+                <div className="mt-2">
+                  <button
+                    onClick={() => setShowCardInfo(true)}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded-full text-sm transition-colors"
+                  >
+                    ℹ️ Card Info
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Current Color Indicator */}
@@ -309,6 +349,8 @@ export default function UnoGameBoard({
               </div>
             )}
           </div>
+
+
 
 
 
@@ -452,6 +494,89 @@ export default function UnoGameBoard({
               className="w-full mt-4 bg-gray-500 hover:bg-gray-600 text-white py-2 rounded-lg transition-colors"
             >
               Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Card Info Modal */}
+      {showCardInfo && selectedCard && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="text-2xl">{getCardInfo(selectedCard).symbol}</div>
+              <div>
+                <h3 className="text-lg font-semibold">{getCardInfo(selectedCard).displayName}</h3>
+                <p className="text-sm text-gray-600">{getCardInfo(selectedCard).description}</p>
+              </div>
+            </div>
+            
+            {/* Additional info for specific cards */}
+            {selectedCard.type === 'unique' && (
+              <div className="bg-purple-50 p-4 rounded-lg mb-4">
+                <h4 className="font-semibold text-purple-800 mb-2">Special Card Effects:</h4>
+                <ul className="text-sm text-purple-700 space-y-1">
+                  {selectedCard.uniqueType === 'shield' && (
+                    <>
+                      <li>• Blocks the next action card played against you</li>
+                      <li>• Reflects the blocked effect back to the opponent</li>
+                      <li>• Can be played as a black card to change color</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'duel' && (
+                    <>
+                      <li>• Both players reveal their next number card</li>
+                      <li>• Player with higher number wins and plays again</li>
+                      <li>• Loser draws 3 cards</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'mirror' && (
+                    <>
+                      <li>• Opponent draws same number of cards you have</li>
+                      <li>• Strategic to use when you have few cards</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'swap-hands' && (
+                    <>
+                      <li>• Exchange your entire hand with opponent</li>
+                      <li>• Can be game-changing when used strategically</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'peek-pick' && (
+                    <>
+                      <li>• Reveals one random opponent card when played</li>
+                      <li>• Can be played as a black card to change color</li>
+                      <li>• Provides tactical information about opponent's hand</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'double-down' && (
+                    <>
+                      <li>• Play two number cards with same value</li>
+                      <li>• Opponent draws 4 cards</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'revenge' && (
+                    <>
+                      <li>• Can only be played after opponent uses action card</li>
+                      <li>• Doubles the effect back to opponent</li>
+                    </>
+                  )}
+                  {selectedCard.uniqueType === 'final-stand' && (
+                    <>
+                      <li>• Can only be played when you have 3 or fewer cards</li>
+                      <li>• Opponent draws cards equal to your hand size</li>
+                      <li>• Activates shield effect</li>
+                    </>
+                  )}
+                </ul>
+              </div>
+            )}
+            
+            <button
+              onClick={() => setShowCardInfo(false)}
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-4 rounded transition-colors"
+            >
+              Close
             </button>
           </div>
         </div>

@@ -86,8 +86,6 @@ export class UnoDeck {
       'double-down',
       'revenge',
       'shield',
-      'time-bomb',
-      'lucky-draw',
       'final-stand'
     ];
 
@@ -274,8 +272,8 @@ function getUniqueCardDisplayInfo(uniqueType: UniqueCardType): {
     case 'peek-pick':
       return {
         displayName: 'Peek & Pick',
-        description: 'Look at opponent\'s hand and force them to discard.',
-        color: 'purple',
+        description: 'Reveals one random opponent card and allows you to change color.',
+        color: 'black',
         symbol: '👁️',
       };
     
@@ -298,25 +296,9 @@ function getUniqueCardDisplayInfo(uniqueType: UniqueCardType): {
     case 'shield':
       return {
         displayName: 'Shield',
-        description: 'Blocks next action card and reflects it back.',
-        color: 'purple',
+        description: 'Can be black and change color. Blocks next action card and reflects it back.',
+        color: 'black',
         symbol: '🛡️',
-      };
-    
-    case 'time-bomb':
-      return {
-        displayName: 'Time Bomb',
-        description: 'Opponent must play within 10 seconds or draw 3.',
-        color: 'purple',
-        symbol: '💣',
-      };
-    
-    case 'lucky-draw':
-      return {
-        displayName: 'Lucky Draw',
-        description: 'Draw 3 cards, keep 1, opponent gets the other 2.',
-        color: 'purple',
-        symbol: '🍀',
       };
     
     case 'final-stand':

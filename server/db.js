@@ -112,9 +112,71 @@ async function getRandomHeadToHeadCard() {
   }
 }
 
+// Filmi Rishta database functions
+async function getRandomActors(count = 2) {
+  try {
+    const result = await client.execute({
+      sql: "SELECT * FROM popular_crew ORDER BY RANDOM() LIMIT ?;",
+      args: [count]
+    });
+    return result.rows;
+  } catch (error) {
+    console.error('Error getting random actors:', error);
+    return [];
+  }
+}
+
+async function getMovieById(movieId) {
+  try {
+    const result = await client.execute({
+      sql: 'SELECT * FROM bollywood_movies WHERE imdb_id = ?',
+      args: [movieId]
+    });
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error getting movie by ID:', error);
+    return null;
+  }
+}
+
+async function getActorById(actorId) {
+  try {
+    const result = await client.execute({
+      sql: 'SELECT * FROM bollywood_crew WHERE crew_id = ?',
+      args: [actorId]
+    });
+    return result.rows[0] || null;
+  } catch (error) {
+    console.error('Error getting actor by ID:', error);
+    return null;
+  }
+}
+
+async function searchMoviesByActor(actorId) {
+  try {
+    // This is a simplified version - in a real app you'd have a junction table
+    // For now, return some sample movies
+    const result = await client.execute({
+      sql: 'SELECT * FROM bollywood_movies ORDER BY RANDOM() LIMIT 5'
+    });
+    return result.rows;
+  } catch (error) {
+    console.error('Error searching movies by actor:', error);
+    return [];
+  }
+}
+
+
+
 module.exports = {
   client,
   initializeDatabase,
   getRandomMovies,
   getRandomHeadToHeadCard,
+  
+  // Filmi Rishta functions
+  getRandomActors,
+  getMovieById,
+  getActorById,
+  searchMoviesByActor,
 }; 
