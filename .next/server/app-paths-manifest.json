@@ -1,4 +1,24 @@
 {
+  "/_not-found": "app/_not-found.js",
+  "/api/filmi-rishta/validate-movie/route": "app/api/filmi-rishta/validate-movie/route.js",
+  "/api/game/add-celebrity/route": "app/api/game/add-celebrity/route.js",
+  "/api/filmi-rishta/validate-celebrity/route": "app/api/filmi-rishta/validate-celebrity/route.js",
+  "/api/game/add-movie/route": "app/api/game/add-movie/route.js",
+  "/api/game/validate-movie/route": "app/api/game/validate-movie/route.js",
+  "/api/search/movies/route": "app/api/search/movies/route.js",
+  "/api/game/validate-celebrity/route": "app/api/game/validate-celebrity/route.js",
+  "/api/validate/route": "app/api/validate/route.js",
+  "/api/test-tmdb/route": "app/api/test-tmdb/route.js",
+  "/blockbuster/page": "app/blockbuster/page.js",
+  "/charades/page": "app/charades/page.js",
+  "/blockbuster-game/[gameId]/page": "app/blockbuster-game/[gameId]/page.js",
+  "/game/[gameId]/page": "app/game/[gameId]/page.js",
+  "/debug-tmdb/page": "app/debug-tmdb/page.js",
+  "/page": "app/page.js",
+  "/uno-game/[gameId]/page": "app/uno-game/[gameId]/page.js",
   "/api/search/actors/route": "app/api/search/actors/route.js",
-  "/filmi-rishta-game/[gameId]/page": "app/filmi-rishta-game/[gameId]/page.js"
+  "/filmi-rishta/page": "app/filmi-rishta/page.js",
+  "/api/search/route": "app/api/search/route.js",
+  "/filmi-rishta-game/[gameId]/page": "app/filmi-rishta-game/[gameId]/page.js",
+  "/uno/page": "app/uno/page.js"
 }

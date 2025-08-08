@@ -2,6 +2,9 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const { v4: uuidv4 } = require('uuid');
 
+// Import fetch for ping mechanism
+const fetch = require('node-fetch');
+
 // Import database functions
 const {
   initializeDatabase,
@@ -14,7 +17,24 @@ const {
   searchMoviesByActor,
 } = require('./db');
 
-const server = createServer();
+const server = createServer((req, res) => {
+  // Health check endpoint for Render
+  if (req.url === '/health' || req.url === '/ping') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      games: games ? games.size : 0
+    }));
+    return;
+  }
+
+  // Default response for other routes
+  res.writeHead(404, { 'Content-Type': 'text/plain' });
+  res.end('Not Found');
+});
+
 const io = new Server(server, {
   cors: {
     origin: process.env.CLIENT_URL || [
@@ -2750,4 +2770,27 @@ async function startServer() {
 }
 
 // Start the server
-startServer(); 
+startServer();
+
+// Self-ping mechanism to keep server alive on Render
+function pingServer() {
+  const serverUrl = process.env.SERVER_URL || `http://localhost:${PORT}`;
+  
+  fetch(`${serverUrl}/health`)
+    .then(response => {
+      if (response.ok) {
+        console.log(`✅ Server ping successful at ${new Date().toISOString()}`);
+      } else {
+        console.log(`⚠️ Server ping failed with status: ${response.status}`);
+      }
+    })
+    .catch(error => {
+      console.log(`❌ Server ping error: ${error.message}`);
+    });
+}
+
+// Ping server every 30 seconds to keep it alive
+setInterval(pingServer, 30 * 1000);
+
+// Initial ping after 5 seconds
+setTimeout(pingServer, 5000);

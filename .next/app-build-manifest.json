@@ -1,15 +1,94 @@
 {
   "pages": {
+    "/_not-found": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/_not-found-aa188ea7a104a38b.js"
+    ],
     "/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/css/app/layout.css",
-      "static/chunks/app/layout.js"
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/705-9d15c8b6d3f9d902.js",
+      "static/css/b20e179594011d85.css",
+      "static/chunks/app/layout-be12763266fb48d3.js"
+    ],
+    "/blockbuster/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/blockbuster/page-df8aba41165954e0.js"
+    ],
+    "/charades/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/charades/page-b8af7585d2d5f150.js"
+    ],
+    "/blockbuster-game/[gameId]/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/705-9d15c8b6d3f9d902.js",
+      "static/chunks/app/blockbuster-game/[gameId]/page-4bcfd22962c0ae1e.js"
+    ],
+    "/game/[gameId]/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/705-9d15c8b6d3f9d902.js",
+      "static/chunks/app/game/[gameId]/page-47a2de50f714d2ac.js"
+    ],
+    "/debug-tmdb/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/debug-tmdb/page-593e5486399ffdb4.js"
+    ],
+    "/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/page-d38f3e2bbf237c26.js"
+    ],
+    "/uno-game/[gameId]/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/705-9d15c8b6d3f9d902.js",
+      "static/chunks/app/uno-game/[gameId]/page-f8c253f646890b8a.js"
+    ],
+    "/filmi-rishta/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/filmi-rishta/page-9d2ee813090af978.js"
     ],
     "/filmi-rishta-game/[gameId]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/filmi-rishta-game/[gameId]/page.js"
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/705-9d15c8b6d3f9d902.js",
+      "static/chunks/app/filmi-rishta-game/[gameId]/page-a22b6ceba83aec6b.js"
+    ],
+    "/uno/page": [
+      "static/chunks/webpack-3c302c40fdf241a8.js",
+      "static/chunks/8242ca59-0451367ada0d32ed.js",
+      "static/chunks/790-0dd285cb5847eb68.js",
+      "static/chunks/main-app-1a80c0a4828f1c4a.js",
+      "static/chunks/app/uno/page-bb15c47ba0162d75.js"
     ]
   }
 }

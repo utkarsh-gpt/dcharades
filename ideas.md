@@ -194,3 +194,9 @@ Game Requirements:
 <!-- 4. "Family Tree" rounds focusing on Bollywood dynasties and relationships. -->
 
 ## 6. 1 second movie guess Bollywood.
+
+
+
+
+Need to add a ping to server every 30 seconds for it to stay alive.
+x
